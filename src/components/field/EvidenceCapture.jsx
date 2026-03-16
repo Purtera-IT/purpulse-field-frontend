@@ -125,16 +125,23 @@ export default function EvidenceCapture({ jobId, evidenceType, stepId, onCapture
           <button
             onClick={() => setStep('queue')}
             className="w-full h-14 rounded-2xl border-2 border-slate-200 flex items-center justify-center gap-2 active:bg-slate-50"
+            aria-label={`View upload queue — ${jobQueue.length} item${jobQueue.length !== 1 ? 's' : ''}${jobQueue.some(i => i.status === 'failed') ? ', contains errors' : ''}`}
           >
             <ListOrdered className="h-4 w-4 text-slate-500" />
             <span className="text-sm font-semibold text-slate-600">
               View Queue ({jobQueue.length})
             </span>
             {jobQueue.some(i => i.status === 'failed') && (
-              <span className="h-2 w-2 rounded-full bg-red-500" />
+              <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
+            )}
+            {jobQueue.some(i => i.status === 'failed') && (
+              <span className="sr-only">— contains failed uploads</span>
             )}
             {jobQueue.some(i => ['uploading','processing'].includes(i.status)) && (
-              <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-blue-500 motion-safe:animate-pulse" aria-hidden="true" />
+            )}
+            {jobQueue.some(i => ['uploading','processing'].includes(i.status)) && (
+              <span className="sr-only">— uploading in progress</span>
             )}
           </button>
         )}
@@ -174,6 +181,7 @@ export default function EvidenceCapture({ jobId, evidenceType, stepId, onCapture
         <button
           onClick={() => setStep('source')}
           className="w-full h-11 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold text-sm active:bg-slate-50"
+          aria-label="Add more evidence"
         >
           + Add More
         </button>
