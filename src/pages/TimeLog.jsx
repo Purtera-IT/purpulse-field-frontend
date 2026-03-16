@@ -91,6 +91,8 @@ export default function TimeLog() {
   const [showManual,   setShowManual]   = useState(false);
   const [locationInfo, setLocationInfo] = useState(null);   // { state, job, distMeters }
   const [localEntries, setLocalEntries] = useState([]);     // optimistic local entries
+  const [geoAlerts,    setGeoAlerts]    = useState([]);     // active geofence alert types
+  const [gpsAccuracy,  setGpsAccuracy]  = useState(null);
 
   const queryClient = useQueryClient();
 
