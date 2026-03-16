@@ -163,7 +163,10 @@ export default function TimerPanel({ jobId, statusLabel }) {
 
         {/* Status pill */}
         <div className="flex items-center justify-center mb-3">
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 backdrop-blur-sm">
+          <div
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 backdrop-blur-sm"
+            aria-live="polite" aria-atomic="true" aria-label={`Timer state: ${cfg.label}`}
+          >
             <span
               className={cn('h-2 w-2 rounded-full flex-shrink-0', cfg.dot, activeState.state !== 'idle' && cfg.pulse && 'motion-safe:animate-pulse')}
               aria-hidden="true"
@@ -233,7 +236,7 @@ export default function TimerPanel({ jobId, statusLabel }) {
               className="h-14 w-14 rounded-2xl bg-white/70 text-red-600 flex items-center justify-center active:opacity-70 flex-shrink-0"
               aria-label="Stop work session"
             >
-              <Square className="h-5 w-5" />
+              <Square className="h-5 w-5" aria-hidden="true" />
             </button>
           )}
         </div>
