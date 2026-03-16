@@ -148,6 +148,8 @@ export default function Jobs() {
                 ×
               </button>
             )}
+          </div>
+
           {/* Filter chips — horizontally scrollable, no scrollbar */}
           <div
             className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1"
