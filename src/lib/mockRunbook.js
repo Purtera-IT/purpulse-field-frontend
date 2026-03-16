@@ -67,6 +67,56 @@ export const MOCK_RUNBOOK = [
           { id: 'c-1-2-3', label: 'Site supervisor notified',        done: true  },
         ],
       },
+      {
+        id: 'task-1-3',
+        phase_id: 'ph-1',
+        title: 'Record Pre-Work Site Conditions',
+        order: 3,
+        gate: 'warning',
+        duration_est: '10 min',
+        status: 'in_progress',
+        instructions: 'Document the site as-found condition before any work begins. Capture all four sides of the work area, record the site contact sign-in timestamp, and note any existing damage or hazards.',
+        tips: ['Photograph in landscape orientation for panoramic context.'],
+        common_mistakes: ['Forgetting to capture the sign-in timestamp — required for billing audit.'],
+        deliverables: [
+          // Demo: blurry photo warning
+          {
+            id: 'd-1-3-1', type: 'photo', label: 'Site overview (as-found)',
+            required: true, status: 'qc_warning', qc_score: 44,
+            qc_warning: 'Image is slightly blurry — retake recommended for compliance',
+            gps_accuracy: 9, geo_lat: 37.7749, geo_lon: -122.4194,
+            captured_at: '2026-03-16T08:55:00Z',
+          },
+          // Demo: low GPS confidence
+          {
+            id: 'd-1-3-2', type: 'photo', label: 'Equipment staging area',
+            required: true, status: 'qc_warning', qc_score: 81,
+            qc_warning: 'Low GPS confidence — photo may not be correctly geo-tagged (±72m accuracy)',
+            gps_accuracy: 72, geo_lat: 37.7751, geo_lon: -122.4188,
+            captured_at: '2026-03-16T08:57:00Z',
+          },
+          // Demo: missing required signature
+          {
+            id: 'd-1-3-3', type: 'signature', label: 'Site contact sign-in',
+            required: true, status: 'pending',
+          },
+          // Demo: missing required timestamp
+          {
+            id: 'd-1-3-4', type: 'timestamp', label: 'Pre-work start timestamp',
+            required: true, status: 'pending',
+          },
+          // Demo: optional note
+          {
+            id: 'd-1-3-5', type: 'note', label: 'Existing damage / site notes',
+            required: false, status: 'pending',
+          },
+        ],
+        checks: [
+          { id: 'c-1-3-1', label: 'All four sides photographed', done: false },
+          { id: 'c-1-3-2', label: 'Site contact present & identified', done: true  },
+          { id: 'c-1-3-3', label: 'No pre-existing damage unclaimed', done: false },
+        ],
+      },
     ],
   },
   {
