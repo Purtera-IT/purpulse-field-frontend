@@ -1,28 +1,29 @@
 /**
  * TaskCard — Expandable task card for the Tasks tab.
- * Shows summary in collapsed state; full execution interface when expanded.
+ * Collapsed: summary, gate badge, deliverable count, QC warnings.
+ * Expanded: instructions, tips/mistakes, checks, deliverables, actions.
  */
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ChevronDown, ChevronUp, Clock, CheckCircle2, AlertOctagon,
-  Circle, PlayCircle, XCircle, Lightbulb, AlertTriangle, ClipboardCheck,
-  ChevronRight, Info,
+  Circle, PlayCircle, XCircle, Lightbulb, ClipboardCheck,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import DeliverableItem from './deliverables/DeliverableItem';
 
 const GATE_CFG = {
-  blocking: { bg: 'bg-red-500',    label: 'Blocking', tip: 'Cannot proceed to next phase until complete' },
-  warning:  { bg: 'bg-amber-500',  label: 'Warning',  tip: 'Should be completed before proceeding'       },
-  info:     { bg: 'bg-blue-400',   label: 'Info',     tip: 'Complete at your discretion'                 },
+  blocking: { bg: 'bg-red-500',   label: 'Blocking', tip: 'Cannot proceed until complete' },
+  warning:  { bg: 'bg-amber-500', label: 'Warning',  tip: 'Should complete before proceeding' },
+  info:     { bg: 'bg-blue-400',  label: 'Info',     tip: 'Complete at your discretion' },
 };
 
 const STATUS_CFG = {
-  pending:     { Icon: Circle,       cls: 'text-slate-400',    bg: 'bg-slate-50',      label: 'Pending'     },
-  in_progress: { Icon: PlayCircle,   cls: 'text-blue-500',     bg: 'bg-blue-50',       label: 'In Progress' },
-  done:        { Icon: CheckCircle2, cls: 'text-emerald-500',  bg: 'bg-emerald-50',    label: 'Complete'    },
-  blocked:     { Icon: XCircle,      cls: 'text-red-500',      bg: 'bg-red-50',        label: 'Blocked'     },
+  pending:     { Icon: Circle,       cls: 'text-slate-400',   label: 'Pending'     },
+  in_progress: { Icon: PlayCircle,   cls: 'text-blue-500',    label: 'In Progress' },
+  done:        { Icon: CheckCircle2, cls: 'text-emerald-500', label: 'Complete'    },
+  blocked:     { Icon: XCircle,      cls: 'text-red-500',     label: 'Blocked'     },
 };
 
 function CheckRow({ check, onToggle }) {
@@ -35,101 +36,105 @@ function CheckRow({ check, onToggle }) {
       )}
     >
       <div className={cn(
-        'h-4.5 w-4.5 h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+        'h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
         check.done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 bg-white'
       )}>
         {check.done && <CheckCircle2 className="h-3 w-3 text-white" />}
       </div>
-      <span className={cn('text-xs font-semibold', check.done && 'line-through')}>{check.label}</span>
+      <span className={cn('text-xs font-semibold', check.done && 'line-through text-slate-400')}>{check.label}</span>
     </button>
   );
 }
 
 export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, onComplete, onEscalate }) {
-  const [expanded,     setExpanded]    = useState(task.status === 'in_progress');
-  const [checks,       setChecks]      = useState(task.checks || []);
-  const [deliverables, setDeliverables] = useState(task.deliverables || []);
-  const [showTips,     setShowTips]    = useState(false);
-  const [status,       setStatus]      = useState(task.status);
+  const [expanded,  setExpanded]  = useState(task.status === 'in_progress');
+  const [checks,    setChecks]    = useState(task.checks || []);
+  const [status,    setStatus]    = useState(task.status);
+  const [showTips,  setShowTips]  = useState(false);
+
+  // Track deliverable statuses independently via callbacks
+  const [delivStatuses, setDelivStatuses] = useState(() => {
+    const map = {};
+    (task.deliverables || []).forEach(d => { map[d.id] = d.status; });
+    return map;
+  });
+
+  const handleDelivCapture = useCallback((id, data) => {
+    setDelivStatuses(prev => ({ ...prev, [id]: data.status }));
+  }, []);
 
   const statusCfg = STATUS_CFG[status] || STATUS_CFG.pending;
   const StatusIcon = statusCfg.Icon;
   const gateCfg = GATE_CFG[task.gate] || GATE_CFG.info;
 
-  // Deliverable gating
-  const requiredDeliverables  = deliverables.filter(d => d.required);
-  const capturedRequired      = requiredDeliverables.filter(d => ['qc_pass', 'qc_warning', 'captured'].includes(d.status));
-  const blockedByDeliverables = capturedRequired.length < requiredDeliverables.length;
-  const allChecksDone         = checks.every(c => c.done);
-  const canComplete           = !blockedByDeliverables && allChecksDone && status !== 'done';
+  const requiredIds    = (task.deliverables || []).filter(d => d.required).map(d => d.id);
+  const capturedCount  = requiredIds.filter(id => ['qc_pass', 'qc_warning', 'captured'].includes(delivStatuses[id])).length;
+  const blockedByDelivs = capturedCount < requiredIds.length;
+  const allChecksDone  = checks.every(c => c.done);
+  const canComplete    = !blockedByDelivs && allChecksDone && status !== 'done';
 
-  const completionPct = requiredDeliverables.length === 0
-    ? (allChecksDone ? 100 : 0)
+  const qcFailCount    = Object.values(delivStatuses).filter(s => s === 'qc_fail').length;
+  const qcWarnCount    = Object.values(delivStatuses).filter(s => s === 'qc_warning').length;
+
+  const completionPct = requiredIds.length === 0
+    ? (allChecksDone ? 100 : Math.round((checks.filter(c => c.done).length / Math.max(checks.length, 1)) * 100))
     : Math.round(
-        ((capturedRequired.length / requiredDeliverables.length) * 0.6 +
-         (checks.filter(c => c.done).length / Math.max(checks.length, 1)) * 0.4) * 100
+        (capturedCount / requiredIds.length) * 0.6 * 100 +
+        (checks.filter(c => c.done).length / Math.max(checks.length, 1)) * 0.4 * 100
       );
 
-  const handleToggleCheck = (id) => {
-    setChecks(prev => prev.map(c => c.id === id ? { ...c, done: !c.done } : c));
-  };
+  const handleToggleCheck = (id) => setChecks(prev => prev.map(c => c.id === id ? { ...c, done: !c.done } : c));
 
-  const handleCapture = (delivId, data) => {
-    setDeliverables(prev => prev.map(d => d.id === delivId ? { ...d, ...data, captured_at: data.captured_at || new Date().toISOString() } : d));
-    toast.success('Deliverable captured');
+  const handleStart = () => {
+    if (status === 'pending' && isPhaseUnlocked) { setStatus('in_progress'); setExpanded(true); }
   };
 
   const handleComplete = () => {
     if (!canComplete) return;
     setStatus('done');
     onComplete?.(task.id);
-    toast.success(`✓ Task complete: ${task.title}`, { duration: 3000 });
+    toast.success(`✓ ${task.title}`, { duration: 2500 });
   };
-
-  const handleStart = () => {
-    if (status === 'pending' && isPhaseUnlocked) {
-      setStatus('in_progress');
-      setExpanded(true);
-    }
-  };
-
-  const qcFailCount    = deliverables.filter(d => d.status === 'qc_fail').length;
-  const qcWarningCount = deliverables.filter(d => d.status === 'qc_warning').length;
 
   return (
     <div className={cn(
       'rounded-2xl border overflow-hidden transition-all',
-      status === 'done'       ? 'border-emerald-200 bg-emerald-50/40'  :
-      status === 'in_progress'? 'border-blue-200 bg-blue-50/30'        :
-      status === 'blocked'    ? 'border-red-200 bg-red-50/30'          :
-      !isPhaseUnlocked        ? 'border-slate-100 bg-slate-50 opacity-60' :
-                                'border-slate-200 bg-white'
+      status === 'done'        ? 'border-emerald-200 bg-emerald-50/40'   :
+      status === 'in_progress' ? 'border-blue-200 bg-blue-50/30'         :
+      status === 'blocked'     ? 'border-red-200 bg-red-50/30'           :
+      !isPhaseUnlocked         ? 'border-slate-100 bg-slate-50 opacity-55' :
+                                 'border-slate-200 bg-white'
     )}>
-      {/* ── Collapsed header ────────────────────────────── */}
+
+      {/* ── Collapsed header ───────────────────────────── */}
       <button
         className="w-full text-left"
-        onClick={() => isPhaseUnlocked ? setExpanded(v => !v) : null}
+        onClick={() => isPhaseUnlocked && setExpanded(v => !v)}
         aria-expanded={expanded}
       >
         <div className="flex items-start gap-3 p-3.5">
-          {/* Order + gate dot */}
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-0.5">
-            <div className={cn('h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black text-white', `bg-${phaseColor}-500`)}>
+          {/* Order chip + gate dot */}
+          <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-0.5">
+            <div className={cn(
+              'h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black text-white',
+              `bg-${phaseColor}-500`
+            )}>
               {orderNum}
             </div>
             <div className={cn('h-2 w-2 rounded-full', gateCfg.bg)} title={gateCfg.tip} />
           </div>
 
           <div className="flex-1 min-w-0">
-            {/* Title + status */}
             <div className="flex items-start gap-2">
-              <p className={cn('text-sm font-black leading-snug flex-1', status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900')}>
+              <p className={cn(
+                'text-sm font-black leading-snug flex-1',
+                status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900'
+              )}>
                 {task.title}
               </p>
               <StatusIcon className={cn('h-4 w-4 flex-shrink-0 mt-0.5', statusCfg.cls)} />
             </div>
 
-            {/* Meta row */}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
                 <Clock className="h-2.5 w-2.5" /> {task.duration_est}
@@ -143,29 +148,22 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
               {qcFailCount > 0 && (
                 <span className="text-[10px] font-black text-red-600 bg-red-50 px-1.5 rounded border border-red-200">{qcFailCount} QC fail</span>
               )}
-              {qcWarningCount > 0 && (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 rounded border border-amber-200">{qcWarningCount} QC warn</span>
+              {qcWarnCount > 0 && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 rounded border border-amber-200">{qcWarnCount} QC warn</span>
               )}
             </div>
 
-            {/* Progress bar */}
-            {status !== 'done' && status !== 'pending' && (
+            {status === 'in_progress' && (
               <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${completionPct}%` }}
-                />
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
               </div>
             )}
 
-            {/* Deliverable summary chips */}
-            {status !== 'done' && requiredDeliverables.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span className="text-[10px] text-slate-400">
-                  {capturedRequired.length}/{requiredDeliverables.length} required
-                </span>
-                {blockedByDeliverables && (
-                  <span className="text-[10px] font-black text-red-600">· Missing deliverables block completion</span>
+            {status !== 'done' && requiredIds.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[10px] text-slate-400">{capturedCount}/{requiredIds.length} required</span>
+                {blockedByDelivs && status === 'in_progress' && (
+                  <span className="text-[10px] font-black text-red-500">· blocks completion</span>
                 )}
               </div>
             )}
@@ -175,7 +173,7 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
         </div>
       </button>
 
-      {/* ── Expanded body ────────────────────────────────── */}
+      {/* ── Expanded body ──────────────────────────────── */}
       {expanded && (
         <div className="border-t border-slate-100">
 
@@ -185,7 +183,7 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
             <p className="text-sm text-slate-700 leading-relaxed">{task.instructions}</p>
           </div>
 
-          {/* Tips + common mistakes (toggle) */}
+          {/* Tips & mistakes toggle */}
           <button
             onClick={() => setShowTips(v => !v)}
             className="w-full flex items-center gap-2 px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-left active:opacity-70"
@@ -224,40 +222,38 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
             </div>
           )}
 
-          {/* Required checks */}
+          {/* Verification checks */}
           {checks.length > 0 && (
             <div className="px-4 py-3 border-b border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                Verification Checks · {checks.filter(c => c.done).length}/{checks.length}
+                Checks · {checks.filter(c => c.done).length}/{checks.length}
               </p>
               <div className="space-y-0.5">
-                {checks.map(c => (
-                  <CheckRow key={c.id} check={c} onToggle={handleToggleCheck} />
-                ))}
+                {checks.map(c => <CheckRow key={c.id} check={c} onToggle={handleToggleCheck} />)}
               </div>
             </div>
           )}
 
           {/* Deliverables */}
-          {deliverables.length > 0 && (
+          {(task.deliverables || []).length > 0 && (
             <div className="px-4 py-3 border-b border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                Required Deliverables · {capturedRequired.length}/{requiredDeliverables.length} captured
+                Deliverables · {capturedCount}/{requiredIds.length} required captured
               </p>
-              {blockedByDeliverables && (
-                <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
+              {blockedByDelivs && status === 'in_progress' && (
+                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
                   <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
                   <p className="text-[11px] font-black text-red-700">
-                    {requiredDeliverables.length - capturedRequired.length} required deliverable{requiredDeliverables.length - capturedRequired.length !== 1 ? 's' : ''} must be captured before completing
+                    {requiredIds.length - capturedCount} required deliverable{requiredIds.length - capturedCount !== 1 ? 's' : ''} block completion
                   </p>
                 </div>
               )}
               <div className="space-y-2">
-                {deliverables.map(d => (
+                {(task.deliverables || []).map(d => (
                   <DeliverableItem
                     key={d.id}
                     deliverable={d}
-                    onCapture={handleCapture}
+                    onCapture={handleDelivCapture}
                     disabled={status === 'done'}
                   />
                 ))}
@@ -265,9 +261,8 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
             </div>
           )}
 
-          {/* Action buttons */}
+          {/* Actions */}
           <div className="px-4 py-3 flex gap-2">
-            {/* Escalate */}
             <button
               onClick={() => onEscalate?.(task)}
               className="flex items-center gap-1.5 h-11 px-3 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex-shrink-0 active:bg-red-50"
@@ -275,7 +270,6 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
               <AlertOctagon className="h-3.5 w-3.5" /> Escalate
             </button>
 
-            {/* Start / Complete */}
             {status === 'pending' && isPhaseUnlocked && (
               <button
                 onClick={handleStart}
@@ -295,11 +289,11 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
                     ? 'bg-emerald-600 text-white active:opacity-80'
                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 )}
-                title={!canComplete ? 'Complete all deliverables and checks first' : undefined}
+                title={!canComplete ? 'Capture all required deliverables and check all items first' : undefined}
               >
                 {canComplete
                   ? <><CheckCircle2 className="h-4 w-4" /> Mark Complete</>
-                  : <><ClipboardCheck className="h-4 w-4" /> Complete Deliverables First</>
+                  : <><ClipboardCheck className="h-4 w-4" /> Deliverables Incomplete</>
                 }
               </button>
             )}
