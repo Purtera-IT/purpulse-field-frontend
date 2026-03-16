@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JobCard from '../components/field/JobCard';
 import OfflineBanner from '../components/field/OfflineBanner';
 import { useJobQueue } from '../hooks/useJobQueue';
-import { Search, Loader2, Briefcase, WifiOff, RefreshCw } from 'lucide-react';
+import { Search, Loader2, Briefcase, Camera, WifiOff, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
