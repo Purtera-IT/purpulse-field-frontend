@@ -141,7 +141,7 @@ export default function JobCard({ job, onStartTimer, isStarting }) {
         {/* Urgent badge */}
         {isUrgent && (
           <div className="absolute top-3 right-10 flex items-center gap-1 bg-orange-50 text-orange-700 rounded-full px-2 py-0.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse inline-block" />
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-500 motion-safe:animate-pulse inline-block" aria-hidden="true" />
             <span className="text-[10px] font-bold uppercase tracking-wide">Urgent</span>
           </div>
         )}
@@ -225,8 +225,9 @@ export default function JobCard({ job, onStartTimer, isStarting }) {
                 onTouchEnd={(e) => { e.stopPropagation(); onStartTimer?.(job); }}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onStartTimer?.(job); }}
                 className="flex-1 h-11 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold flex items-center justify-center gap-2 active:opacity-80"
+                aria-label={`Resume timer for ${job.title}`}
               >
-                <Play className="h-3.5 w-3.5" />
+                <Play className="h-3.5 w-3.5" aria-hidden="true" />
                 Resume
               </button>
             )}
