@@ -398,7 +398,7 @@ export default function Support() {
             isOnline ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
           )}>
             {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {isOnline ? 'Online' : 'Offline'}
+            {isOnline ? 'All systems operational' : 'Offline'}
           </div>
           {failedCount > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-red-50 border-red-200 text-xs font-bold text-red-700">
