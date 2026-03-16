@@ -106,15 +106,10 @@ export default function QuickActionsBar({ job }) {
         </SheetContent>
       </Sheet>
 
-      {/* ── Safety Checklist sheet ────────────────────── */}
-      <Sheet open={sheet === 'safety'} onOpenChange={v => !v && setSheet(null)}>
-        <SheetContent side="bottom" className="rounded-t-3xl pb-10 max-h-[80vh] overflow-y-auto">
-          <div className="pt-2">
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
-            <SafetyChecklist onDone={() => setSheet(null)} />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* ── Safety Checklist modal ────────────────────── */}
+      {sheet === 'safety' && (
+        <SafetyChecklistModal onClose={() => setSheet(null)} />
+      )}
 
       {/* ── Overflow menu ─────────────────────────────── */}
       <Sheet open={sheet === 'overflow'} onOpenChange={v => !v && setSheet(null)}>
