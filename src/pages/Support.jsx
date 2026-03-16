@@ -11,10 +11,11 @@ import {
   BookOpen, Activity, Phone, ChevronDown, ChevronUp, ChevronRight,
   FileText, Download, Search, AlertTriangle, CheckCircle2, RefreshCw,
   WifiOff, Wifi, AlertOctagon, HelpCircle, Wrench, FileSearch,
-  RotateCcw, UploadCloud, Clock, XCircle, PhoneCall, Mail,
+  RotateCcw, UploadCloud, Clock, XCircle, PhoneCall, Mail, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 // ── Shared ──────────────────────────────────────────────────────────
 function SectionHeader({ icon: Icon, title, subtitle, color = 'text-slate-600' }) {
