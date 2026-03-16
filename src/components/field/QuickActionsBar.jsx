@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import EvidenceCapture from './EvidenceCapture';
 import BlockerForm from './BlockerForm';
+import SafetyChecklistModal from './SafetyChecklistModal';
 
 const STATUS_OPTIONS = [
   { value: 'en_route',         label: 'En Route' },
