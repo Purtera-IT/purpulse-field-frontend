@@ -61,6 +61,8 @@ import AdminAuditLog from './pages/AdminAuditLog';
 import AdminUsers from './pages/AdminUsers';
 import AdminDevices from './pages/AdminDevices';
 import DevModelInputs from './pages/DevModelInputs';
+import Chat from './pages/Chat';
+import Profile from './pages/Profile';
 import __Layout from './Layout.jsx';
 
 
@@ -79,6 +81,8 @@ export const PAGES = {
     "AdminUsers": AdminUsers,
     "AdminDevices": AdminDevices,
     "DevModelInputs": DevModelInputs,
+    "Chat": Chat,
+    "Profile": Profile,
 }
 
 export const pagesConfig = {
