@@ -1,57 +1,72 @@
+/**
+ * Layout.jsx — Purpulse Field App Shell
+ * Provides: TopBar, 5-tab bottom nav, skip link, safe-area support
+ *
+ * Nav tabs: Jobs | Time | Chat | Support | Profile
+ * Admin pages use AdminShell directly — no Layout wrapping.
+ */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { Briefcase, Zap, Camera, Clock, HelpCircle } from 'lucide-react';
+import { Briefcase, Clock, MessageCircle, HelpCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import SyncIndicator from './components/field/SyncIndicator';
+import TopBar from './components/shell/TopBar';
 
 const NAV_ITEMS = [
-  { page: 'Jobs', icon: Briefcase, label: 'Jobs' },
-  { page: 'ActiveJob', icon: Zap, label: 'Active' },
-  { page: 'EvidenceHub', icon: Camera, label: 'Evidence' },
-  { page: 'TimeLog', icon: Clock, label: 'Time' },
-  { page: 'Support', icon: HelpCircle, label: 'Support' },
+  { page: 'Jobs',    icon: Briefcase,      label: 'Jobs'    },
+  { page: 'TimeLog', icon: Clock,          label: 'Time'    },
+  { page: 'Chat',    icon: MessageCircle,  label: 'Chat'    },
+  { page: 'Support', icon: HelpCircle,     label: 'Support' },
+  { page: 'Profile', icon: User,           label: 'Profile' },
 ];
 
-const HIDE_NAV_PAGES = ['JobDetail'];
+// Pages that suppress the nav + topbar (full-screen flows)
+const HIDE_SHELL_PAGES = ['JobDetail', 'Onboarding'];
+
+// Pages that suppress only the bottom nav (but keep topbar)
+const HIDE_NAV_PAGES   = [];
+
+// Page titles and subtitles
+const PAGE_META = {
+  Jobs:       { title: 'Purpulse', subtitle: 'Field Operations' },
+  TimeLog:    { title: 'Time',     subtitle: 'Work session log' },
+  Chat:       { title: 'Messages', subtitle: 'Job threads & dispatch' },
+  Support:    { title: 'Support',  subtitle: 'Help & diagnostics' },
+  Profile:    { title: 'Profile',  subtitle: 'Identity & certifications' },
+  JobDetail:  { title: 'Job Detail' },
+  EvidenceHub:{ title: 'Evidence', subtitle: 'Capture & review' },
+  ActiveJob:  { title: 'Active Job' },
+};
 
 export default function Layout({ children, currentPageName }) {
-  const showNav = !HIDE_NAV_PAGES.includes(currentPageName);
+  const hideShell = HIDE_SHELL_PAGES.includes(currentPageName);
+  const hideNav   = hideShell || HIDE_NAV_PAGES.includes(currentPageName);
+  const meta      = PAGE_META[currentPageName] ?? { title: currentPageName };
+
+  if (hideShell) {
+    // Full-screen pages (onboarding, job detail) get no chrome at all
+    return <>{children}</>;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Skip to main content — keyboard accessibility */}
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <style>{`
-        :root {
-          --color-primary: #0f172a;
-          --color-primary-light: #334155;
-        }
-        body {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
-      `}</style>
 
-      {/* Top sync bar */}
-      {showNav && (
-        <div className="fixed top-0 left-0 right-0 z-30 flex justify-center py-2 pointer-events-none">
-          <div className="pointer-events-auto">
-            <SyncIndicator />
-          </div>
-        </div>
-      )}
+      {/* ── Top Bar ──────────────────────────────────── */}
+      <TopBar title={meta.title} subtitle={meta.subtitle} />
 
-      <main id="main-content">{children}</main>
+      {/* ── Page Content ─────────────────────────────── */}
+      <main id="main-content" className="flex-1">
+        {children}
+      </main>
 
-      {/* Bottom Tab Bar */}
-      {showNav && (
-        <nav aria-label="Primary navigation" className="fixed bottom-0 left-0 right-0 z-30 bg-white/80 backdrop-blur-xl border-t border-slate-100">
-          <div className="max-w-lg mx-auto flex">
+      {/* ── Bottom Tab Bar ────────────────────────────── */}
+      {!hideNav && (
+        <nav
+          aria-label="Primary navigation"
+          className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-slate-100"
+        >
+          <div className="max-w-2xl mx-auto flex">
             {NAV_ITEMS.map(item => {
               const Icon = item.icon;
               const isActive = currentPageName === item.page;
@@ -62,22 +77,27 @@ export default function Layout({ children, currentPageName }) {
                   aria-current={isActive ? 'page' : undefined}
                   aria-label={item.label}
                   className={cn(
-                    'flex-1 flex flex-col items-center gap-0.5 py-2 pt-3 transition-colors',
-                    isActive ? 'text-slate-900' : 'text-slate-400'
+                    'flex-1 flex flex-col items-center gap-0.5 pt-2.5 pb-1 transition-colors min-h-[56px] justify-center',
+                    isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'
                   )}
                 >
-                  <Icon className={cn('h-5 w-5', isActive && 'stroke-[2.5px]')} />
-                  <span className={cn('text-[10px] font-medium', isActive && 'font-semibold')}>
+                  <div className={cn(
+                    'h-8 w-12 rounded-xl flex items-center justify-center transition-all',
+                    isActive ? 'bg-slate-900' : 'bg-transparent'
+                  )}>
+                    <Icon className={cn('h-5 w-5', isActive ? 'text-white stroke-[2.5px]' : '')} aria-hidden="true" />
+                  </div>
+                  <span className={cn(
+                    'text-[10px] font-semibold',
+                    isActive ? 'text-slate-900 font-bold' : 'text-slate-400'
+                  )}>
                     {item.label}
                   </span>
-                  {isActive && (
-                    <div className="h-0.5 w-4 bg-slate-900 rounded-full" />
-                  )}
                 </Link>
               );
             })}
           </div>
-          {/* Safe area padding for iOS */}
+          {/* iOS safe area */}
           <div className="h-[env(safe-area-inset-bottom)]" />
         </nav>
       )}
