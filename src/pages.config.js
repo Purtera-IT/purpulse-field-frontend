@@ -60,6 +60,7 @@ import AdminSnapshot from './pages/AdminSnapshot';
 import AdminAuditLog from './pages/AdminAuditLog';
 import AdminUsers from './pages/AdminUsers';
 import AdminDevices from './pages/AdminDevices';
+import DevModelInputs from './pages/DevModelInputs';
 import __Layout from './Layout.jsx';
 
 
