@@ -7,8 +7,9 @@ import { useQuery } from '@tanstack/react-query';
 import {
   User, LogOut, Smartphone, Shield, Bell, MapPin, Camera,
   ChevronRight, ShieldCheck, AlertTriangle, XCircle, Star,
-  Clock, Briefcase, TrendingUp, Info, Eye,
+  Clock, Briefcase, TrendingUp, Info, Eye, Link as LinkIcon,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { MOCK_PROFILE } from '@/lib/mockData';
