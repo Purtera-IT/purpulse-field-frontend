@@ -35,11 +35,11 @@ function enrichMockJob(job) {
 }
 
 const TABS = [
-  { id: 'overview', Icon: Info,          label: 'Overview' },
-  { id: 'tasks',    Icon: ClipboardList, label: 'Tasks'    },
-  { id: 'time',     Icon: Clock,         label: 'Time'     },
-  { id: 'chat',     Icon: MessageCircle, label: 'Chat'     },
-  { id: 'files',    Icon: Folder,        label: 'Files'    },
+  { id: 'overview', Icon: Info,          label: 'Overview', shortLabel: 'Brief'    },
+  { id: 'tasks',    Icon: ClipboardList, label: 'Tasks',    shortLabel: 'Tasks'    },
+  { id: 'time',     Icon: Clock,         label: 'Time',     shortLabel: 'Time'     },
+  { id: 'chat',     Icon: MessageCircle, label: 'Chat',     shortLabel: 'Chat'     },
+  { id: 'files',    Icon: Folder,        label: 'Files',    shortLabel: 'Files'    },
 ];
 
 const ACTIVE_STATUSES = ['en_route', 'checked_in', 'in_progress', 'paused'];
