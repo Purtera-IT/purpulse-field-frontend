@@ -20,6 +20,8 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Skip to main content — keyboard accessibility */}
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <style>{`
         :root {
           --color-primary: #0f172a;
@@ -44,12 +46,13 @@ export default function Layout({ children, currentPageName }) {
         </div>
       )}
 
-      {children}
+      <main id="main-content">{children}</main>
 
       {/* Bottom Tab Bar */}
       {showNav && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/80 backdrop-blur-xl border-t border-slate-100">
-          <div className="max-w-lg mx-auto flex">
+          <nav aria-label="Primary navigation">
+        <div className="max-w-lg mx-auto flex">
             {NAV_ITEMS.map(item => {
               const Icon = item.icon;
               const isActive = currentPageName === item.page;
@@ -57,6 +60,8 @@ export default function Layout({ children, currentPageName }) {
                 <Link
                   key={item.page}
                   to={createPageUrl(item.page)}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={item.label}
                   className={cn(
                     'flex-1 flex flex-col items-center gap-0.5 py-2 pt-3 transition-colors',
                     isActive ? 'text-slate-900' : 'text-slate-400'
@@ -76,6 +81,7 @@ export default function Layout({ children, currentPageName }) {
           {/* Safe area padding for iOS */}
           <div className="h-[env(safe-area-inset-bottom)]" />
         </div>
+        </nav>
       )}
     </div>
   );
