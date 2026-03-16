@@ -145,7 +145,7 @@ function HelpCenter({ onOpenArtifact }) {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Field Artifacts</p>
         </div>
         {FIELD_ARTIFACTS.map((a, i) => (
-          <button key={i} onClick={() => toast.info(`Downloading ${a.name}…`)}
+          <button key={i} onClick={() => onOpenArtifact?.(a)}
             className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 last:border-0 active:bg-slate-50 text-left">
             <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
               <FileText className="h-4 w-4 text-emerald-600" />
@@ -155,7 +155,7 @@ function HelpCenter({ onOpenArtifact }) {
               <p className="text-[11px] text-slate-400">{a.type} · {a.size}</p>
             </div>
             <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-200 flex-shrink-0">{a.tag}</span>
-            <Download className="h-4 w-4 text-slate-400 flex-shrink-0" />
+            <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />
           </button>
         ))}
       </div>
