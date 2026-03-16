@@ -169,11 +169,11 @@ export default function JobDetail() {
       </div>
 
       {/* ── Scrollable body ───────────────────────────────── */}
-      <div className="flex-1 max-w-lg mx-auto w-full px-4 py-4 pb-36 space-y-3">
+      <div className="flex-1 max-w-lg mx-auto w-full px-4 py-3 pb-36 space-y-3">
 
         {isReadOnly && (
-          <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700 font-semibold text-center border border-blue-100">
-            ✓ This job has been submitted — view only
+          <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700 font-semibold text-center border border-blue-100 flex items-center justify-center gap-2">
+            <span className="text-emerald-600">✓</span> This job has been submitted — view only
           </div>
         )}
 
@@ -185,22 +185,32 @@ export default function JobDetail() {
               onStatusChange={handleLocationChange}
               onAlert={handleGeoAlert}
             />
+            {job.deliverables_remaining > 0 && (
+              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                {job.deliverables_remaining} deliverable{job.deliverables_remaining !== 1 ? 's' : ''} remaining
+              </span>
+            )}
           </div>
         )}
         {geoAlerts.length > 0 && (
           <GeofenceAlerts alerts={geoAlerts} accuracy={gpsAccuracy} />
         )}
 
-        {/* ── Sticky Timer (active jobs only, at top of scrollable area) ── */}
+        {/* ── Compact Timer strip (active jobs, not on time tab) ── */}
         {isActive && !isReadOnly && activeTab !== 'time' && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
-            <TimerPanel jobId={job.id} statusLabel={statusLabel} />
+          <div
+            className="flex items-center gap-3 bg-emerald-600 text-white rounded-2xl px-4 py-3 cursor-pointer active:opacity-90"
+            onClick={() => setActiveTab('time')}
+          >
+            <div className="h-2.5 w-2.5 rounded-full bg-emerald-300 motion-safe:animate-pulse flex-shrink-0" />
+            <TimerPanel jobId={job.id} statusLabel={statusLabel} compact />
+            <span className="text-[10px] opacity-60 ml-auto flex-shrink-0">tap for details →</span>
           </div>
         )}
 
         {/* ── Tab content ────────────────────────────────── */}
         {activeTab === 'overview' && (
-          <JobDetailOverview job={job} />
+          <JobDetailOverview job={job} onNavigateToTasks={() => setActiveTab('tasks')} />
         )}
 
         {activeTab === 'tasks' && (
