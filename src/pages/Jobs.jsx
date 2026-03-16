@@ -15,6 +15,7 @@ import JobRichCard, { PRIORITY_CFG, STATUS_CFG, getProgress, formatSchedule } fr
 import JobsCalendar from '../components/field/JobsCalendar';
 import { useJobQueue } from '../hooks/useJobQueue';
 import { MOCK_JOBS } from '../lib/mockJobs';
+import ActiveJobHero from '../components/field/ActiveJobHero';
 
 // ── Filter definitions ───────────────────────────────────────────────
 const STATUS_CHIPS = [
