@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin, Phone, Clock, ChevronRight, Package,
-  Cloud, RefreshCw, CloudOff, Zap, AlertTriangle,
+  Cloud, RefreshCw, CloudOff, Zap, AlertTriangle, ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
