@@ -58,7 +58,7 @@ export const MOCK_RUNBOOK = [
         deliverables: [
           { id: 'd-1-2-1', type: 'photo', label: 'Perimeter — North view',  required: true, status: 'qc_pass',    qc_score: 88, captured_at: '2026-03-16T08:35:00Z' },
           { id: 'd-1-2-2', type: 'photo', label: 'Perimeter — South view',  required: true, status: 'qc_pass',    qc_score: 85, captured_at: '2026-03-16T08:36:00Z' },
-          { id: 'd-1-2-3', type: 'photo', label: 'Perimeter — Entry signage', required: true, status: 'qc_warning', qc_score: 54, qc_warning: 'Image slightly blurry — retake recommended', captured_at: '2026-03-16T08:37:00Z' },
+          { id: 'd-1-2-3', type: 'photo', label: 'Perimeter — Entry signage', required: true, status: 'qc_warning', qc_score: 47, qc_warning: 'Image is slightly blurry — retake recommended for compliance', gps_accuracy: 8, geo_lat: 37.7749, geo_lon: -122.4194, captured_at: '2026-03-16T08:37:00Z' },
           { id: 'd-1-2-4', type: 'note',  label: 'Access restrictions noted', required: false, status: 'captured', value: 'East gate locked, contractor badge required. Security on-site 24/7.' },
         ],
         checks: [
