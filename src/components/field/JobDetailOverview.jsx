@@ -229,6 +229,16 @@ export default function JobDetailOverview({ job, onNavigateToTasks }) {
         </SectionCard>
       )}
 
+      {/* ── Quick-start CTA ─────────────────────────────── */}
+      {onNavigateToTasks && ['in_progress', 'checked_in', 'en_route', 'paused'].includes(job.status) && (
+        <button
+          onClick={onNavigateToTasks}
+          className="w-full h-14 rounded-2xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80 transition-opacity"
+        >
+          <ClipboardList className="h-5 w-5" /> View Tasks & Deliverables
+        </button>
+      )}
+
     </div>
   );
 }
