@@ -22,6 +22,8 @@ import TasksTab from '../components/field/TasksTab';
 import EvidenceTab from '../components/field/EvidenceTab';
 import ChatView from '../components/field/ChatView';
 import { StatusBadge, SyncBadge } from '../components/field/StatusBadge';
+import GeofenceAlerts from '../components/field/GeofenceAlerts';
+import LocationBadge from '../components/time/LocationBadge';
 
 // Enrich a mock job with fields the overview expects
 function enrichMockJob(job) {
