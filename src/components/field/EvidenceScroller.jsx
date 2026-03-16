@@ -1,91 +1,16 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, AlertTriangle, CheckCircle2, Clock, X, ChevronRight } from 'lucide-react';
-import { format } from 'date-fns';
+import { Camera, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import EvidenceTile from './EvidenceTile';
+import EvidenceDetailSheet from './EvidenceDetailSheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
-const QC_CFG = {
-  ok:      { icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500', label: 'OK' },
-  warning: { icon: AlertTriangle, color: 'text-amber-500',  bg: 'bg-amber-500',   label: '!' },
-  fail:    { icon: AlertTriangle, color: 'text-red-500',    bg: 'bg-red-500',      label: '✕' },
-  pending: { icon: Clock,         color: 'text-slate-400',  bg: 'bg-slate-400',   label: '…' },
-};
 
-function Tile({ item, onTap }) {
-  const qc = QC_CFG[item.qc_status || 'pending'];
-  return (
-    <button
-      onClick={() => onTap(item)}
-      className="relative flex-shrink-0 w-[88px] h-[88px] rounded-2xl overflow-hidden bg-slate-100 active:scale-95 transition-transform"
-      aria-label={`${item.evidence_type?.replace(/_/g,' ')} captured at ${item.captured_at ? format(new Date(item.captured_at), 'h:mm a') : 'unknown time'}, QC: ${item.qc_status || 'pending'}`}
-    >
-      {item.file_url || item.thumbnail_url ? (
-        <img src={item.thumbnail_url || item.file_url} alt={item.evidence_type} className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Camera className="h-7 w-7 text-slate-300" />
-        </div>
-      )}
-
-      {/* QC dot */}
-      <div className={cn('absolute bottom-1.5 left-1.5 h-4 w-4 rounded-full flex items-center justify-center', qc.bg)}>
-        <span className="text-white text-[9px] font-black leading-none">{qc.label}</span>
-      </div>
-
-      {/* Type chip */}
-      <div className="absolute top-1 left-0 right-0 px-1">
-        <span className="block text-center text-[9px] font-semibold text-white bg-black/50 rounded px-1 truncate leading-4">
-          {item.evidence_type?.replace(/_/g,' ')}
-        </span>
-      </div>
-
-      {/* Upload pending dot */}
-      {item.status === 'pending_upload' && (
-        <div className="absolute top-1 right-1 h-3 w-3 rounded-full bg-amber-400 border-2 border-white" />
-      )}
-    </button>
-  );
-}
-
-function LightboxModal({ item, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={onClose}>
-      <div className="flex items-center justify-between p-4 flex-shrink-0" onClick={e => e.stopPropagation()}>
-        <div>
-          <p className="text-white font-semibold capitalize">{item.evidence_type?.replace(/_/g,' ')}</p>
-          {item.captured_at && (
-            <p className="text-white/50 text-xs mt-0.5">{format(new Date(item.captured_at), 'MMM d, h:mm a')}</p>
-          )}
-        </div>
-        <button onClick={onClose} className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center">
-          <X className="h-5 w-5 text-white" />
-        </button>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
-        {item.file_url ? (
-          <img src={item.file_url} alt={item.evidence_type} className="max-w-full max-h-full rounded-2xl object-contain" />
-        ) : (
-          <div className="text-white/40 text-sm">No preview available</div>
-        )}
-      </div>
-
-      {/* Evidence details */}
-      <div className="p-4 bg-black/50 flex-shrink-0" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-3">
-          {(() => { const qc = QC_CFG[item.qc_status || 'pending']; const Icon = qc.icon;
-            return <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold', qc.bg)}><Icon className="h-3 w-3 text-white"/><span className="text-white">QC {item.qc_status || 'pending'}</span></div>;
-          })()}
-          {item.qc_message && <p className="text-white/60 text-xs">{item.qc_message}</p>}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function EvidenceScroller({ job, onAddPhoto }) {
-  const [lightbox, setLightbox] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['evidence', job?.id],
@@ -115,7 +40,7 @@ export default function EvidenceScroller({ job, onAddPhoto }) {
           </button>
 
           {visible.map(item => (
-            <Tile key={item.id} item={item} onTap={setLightbox} />
+            <EvidenceTile key={item.id} item={item} size={88} onTap={setDetailItem} />
           ))}
 
           {visible.length === 0 && (
@@ -126,7 +51,14 @@ export default function EvidenceScroller({ job, onAddPhoto }) {
         </div>
       </div>
 
-      {lightbox && <LightboxModal item={lightbox} onClose={() => setLightbox(null)} />}
+      <Sheet open={!!detailItem} onOpenChange={v => !v && setDetailItem(null)}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto pb-10">
+          <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-5" />
+          {detailItem && (
+            <EvidenceDetailSheet item={detailItem} onClose={() => setDetailItem(null)} />
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
