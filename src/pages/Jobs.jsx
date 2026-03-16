@@ -1,81 +1,184 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import JobCard from '../components/field/JobCard';
-import OfflineBanner from '../components/field/OfflineBanner';
-import { useJobQueue } from '../hooks/useJobQueue';
-import { Search, Loader2, Briefcase, Camera, WifiOff, RefreshCw } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { parseISO, isToday, isTomorrow, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
+import {
+  Search, Loader2, LayoutGrid, List, CalendarDays,
+  SlidersHorizontal, X, ChevronRight, WifiOff, RefreshCw, Camera,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import OfflineBanner from '../components/field/OfflineBanner';
+import JobRichCard, { PRIORITY_CFG, STATUS_CFG, getProgress, formatSchedule } from '../components/field/JobRichCard';
+import JobsCalendar from '../components/field/JobsCalendar';
+import { useJobQueue } from '../hooks/useJobQueue';
+import { MOCK_JOBS } from '../lib/mockJobs';
 
-const STATUS_FILTERS = [
+// ── Filter definitions ───────────────────────────────────────────────
+const STATUS_CHIPS = [
   { value: 'all',              label: 'All' },
+  { value: 'active',           label: '⚡ Active' },
   { value: 'assigned',         label: 'Assigned' },
-  { value: 'in_progress',      label: 'Active' },
   { value: 'pending_closeout', label: 'Closeout' },
-  { value: 'urgent',           label: '🔴 Urgent' },
+  { value: 'completed',        label: '✓ Done' },
 ];
 
-const FILTER_KEY = 'purpulse_jobs_filter';
+const PRIORITY_OPTS = [
+  { value: 'all',    label: 'Any Priority' },
+  { value: 'urgent', label: '🔴 Urgent' },
+  { value: 'high',   label: '🟠 High' },
+  { value: 'medium', label: '🔵 Medium' },
+  { value: 'low',    label: '⚪ Low' },
+];
 
-function getFilterCount(jobs, value) {
-  if (value === 'all')     return jobs.length;
-  if (value === 'urgent')  return jobs.filter(j => j.priority === 'urgent').length;
-  if (value === 'in_progress') return jobs.filter(j => ['checked_in','in_progress','paused','en_route'].includes(j.status)).length;
-  return jobs.filter(j => j.status === value).length;
-}
+const DATE_OPTS = [
+  { value: 'all',      label: 'Any Date' },
+  { value: 'today',    label: 'Today' },
+  { value: 'tomorrow', label: 'Tomorrow' },
+  { value: 'week',     label: 'This Week' },
+];
 
-function matchesFilter(job, filter) {
-  if (filter === 'all')     return true;
-  if (filter === 'urgent')  return job.priority === 'urgent';
-  if (filter === 'in_progress') return ['checked_in','in_progress','paused','en_route'].includes(job.status);
+function matchesStatus(job, filter) {
+  if (filter === 'all')      return true;
+  if (filter === 'active')   return ['en_route','checked_in','in_progress','paused'].includes(job.status);
+  if (filter === 'completed') return ['submitted','approved'].includes(job.status);
   return job.status === filter;
 }
 
-export default function Jobs() {
-  const [search, setSearch]           = useState('');
-  const [activeFilter, setActiveFilter] = useState(
-    () => localStorage.getItem(FILTER_KEY) || 'all'
+function matchesDate(job, filter) {
+  if (filter === 'all' || !job.scheduled_date) return true;
+  try {
+    const d = parseISO(job.scheduled_date);
+    if (filter === 'today')    return isToday(d);
+    if (filter === 'tomorrow') return isTomorrow(d);
+    if (filter === 'week')     return isWithinInterval(d, { start: startOfWeek(new Date()), end: endOfWeek(new Date()) });
+  } catch { return true; }
+  return true;
+}
+
+// ── Compact list row ────────────────────────────────────────────────
+function JobListRow({ job }) {
+  const prio      = PRIORITY_CFG[job.priority]  || PRIORITY_CFG.medium;
+  const statusCfg = STATUS_CFG[job.status]      || STATUS_CFG.assigned;
+  const progress  = getProgress(job);
+  const schedule  = formatSchedule(job);
+
+  return (
+    <Link
+      to={`/JobDetail?id=${job.id}`}
+      className="flex items-center gap-3 bg-white rounded-xl border border-slate-100 px-4 py-3.5 active:bg-slate-50 transition-colors"
+    >
+      {/* Priority color stripe */}
+      <div className={cn('h-10 w-1 rounded-full flex-shrink-0', prio.dotClass)} />
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <p className="text-sm font-black text-slate-900 truncate flex-1">{job.title}</p>
+          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0', statusCfg.badgeClass)}>
+            {statusCfg.label}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 truncate">{job.company_name || job.project_name}</p>
+        <div className="flex items-center gap-3 mt-1.5">
+          {schedule && <p className="text-[11px] text-slate-400 flex-1 truncate">{schedule}</p>}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="h-1 w-14 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full', progress === 100 ? 'bg-emerald-500' : 'bg-blue-400')}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 tabular-nums">{progress}%</span>
+          </div>
+        </div>
+      </div>
+
+      <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />
+    </Link>
   );
-  const [startingJobId, setStartingJobId] = useState(null);
-  const [isRefreshing,  setIsRefreshing]  = useState(false);
+}
+
+// ── Empty state ──────────────────────────────────────────────────────
+function EmptyState({ isOnline }) {
+  if (!isOnline) {
+    return (
+      <div className="text-center py-16">
+        <div className="h-16 w-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+          <WifiOff className="h-8 w-8 text-amber-400" />
+        </div>
+        <p className="text-slate-700 font-semibold">You're offline</p>
+        <p className="text-slate-400 text-sm mt-1">Showing cached jobs</p>
+      </div>
+    );
+  }
+  return (
+    <div className="text-center py-16">
+      <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+        <Search className="h-8 w-8 text-slate-300" />
+      </div>
+      <p className="text-slate-600 font-semibold">No jobs match filters</p>
+      <p className="text-slate-400 text-sm mt-1">Try adjusting your filters or search</p>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────
+export default function Jobs() {
+  const [view,           setView]           = useState(() => localStorage.getItem('purpulse_jobs_view') || 'cards');
+  const [search,         setSearch]         = useState('');
+  const [statusFilter,   setStatusFilter]   = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [dateFilter,     setDateFilter]     = useState('all');
+  const [techFilter,     setTechFilter]     = useState('all');
+  const [showAdvanced,   setShowAdvanced]   = useState(false);
+  const [isRefreshing,   setIsRefreshing]   = useState(false);
 
   const queryClient = useQueryClient();
   const listRef     = useRef(null);
   const pullStartY  = useRef(null);
 
-  const { startTimer, isOnline, pendingCount, failedCount } = useJobQueue();
+  const { isOnline, pendingCount, failedCount } = useJobQueue();
 
-  const { data: jobs = [], isLoading } = useQuery({
+  const { data: dbJobs = [], isLoading } = useQuery({
     queryKey: ['jobs'],
     queryFn: () => base44.entities.Job.list('-scheduled_date', 100),
     staleTime: 30_000,
   });
 
-  // Persist filter choice
-  useEffect(() => {
-    localStorage.setItem(FILTER_KEY, activeFilter);
-  }, [activeFilter]);
+  const allJobs = dbJobs.length > 0 ? dbJobs : MOCK_JOBS;
 
-  const filtered = jobs.filter(job => {
+  // Derive unique techs for filter dropdown
+  const techs = [...new Map(allJobs.map(j => [j.assigned_to, j.assigned_name || j.assigned_to])).entries()];
+
+  useEffect(() => { localStorage.setItem('purpulse_jobs_view', view); }, [view]);
+
+  const filtered = allJobs.filter(job => {
     const q = search.toLowerCase();
-    const matchesSearch = !q ||
+    const matchSearch = !q ||
       job.title?.toLowerCase().includes(q) ||
+      job.company_name?.toLowerCase().includes(q) ||
       job.site_name?.toLowerCase().includes(q) ||
-      job.project_name?.toLowerCase().includes(q) ||
-      job.site_address?.toLowerCase().includes(q);
-    return matchesSearch && matchesFilter(job, activeFilter);
+      job.site_address?.toLowerCase().includes(q) ||
+      job.project_name?.toLowerCase().includes(q);
+    const matchStatus   = matchesStatus(job, statusFilter);
+    const matchPriority = priorityFilter === 'all' || job.priority === priorityFilter;
+    const matchDate     = matchesDate(job, dateFilter);
+    const matchTech     = techFilter === 'all' || job.assigned_to === techFilter;
+    return matchSearch && matchStatus && matchPriority && matchDate && matchTech;
   });
 
-  // ── Pull-to-refresh ──────────────────────────────────────────────
+  const activeFilterCount = [
+    priorityFilter !== 'all', dateFilter !== 'all', techFilter !== 'all',
+  ].filter(Boolean).length;
+
+  // Pull-to-refresh
   const onPullStart = (e) => {
-    if (listRef.current?.scrollTop === 0) {
-      pullStartY.current = e.touches[0].clientY;
-    }
+    if (listRef.current?.scrollTop === 0) pullStartY.current = e.touches[0].clientY;
   };
   const onPullEnd = async (e) => {
-    if (pullStartY.current === null) return;
+    if (!pullStartY.current) return;
     const dy = e.changedTouches[0].clientY - pullStartY.current;
     pullStartY.current = null;
     if (dy > 72) {
@@ -85,149 +188,203 @@ export default function Jobs() {
     }
   };
 
-  // ── Start Timer ─────────────────────────────────────────────────
-  const handleStartTimer = useCallback(async (job) => {
-    if (startingJobId) return;
-    setStartingJobId(job.id);
-    try {
-      const entry = await startTimer(job, null);
-      toast.success(
-        isOnline ? 'Timer started' : 'Queued for sync',
-        {
-          description: job.title,
-          duration: 3000,
-        }
-      );
-      // Dev log — mirrors POST /api/v1/jobs/{jobId}/events body
-      console.info('[Purpulse] Job event queued:', JSON.stringify({
-        client_event_id: entry.client_event_id,
-        event_type: entry.event_type,
-        job_id: entry.job_id,
-        device_ts: entry.device_ts,
-        device_meta: entry.device_meta,
-      }, null, 2));
-    } finally {
-      setTimeout(() => setStartingJobId(null), 1200);
-    }
-  }, [startTimer, isOnline, startingJobId]);
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
-      {/* ── Filters header ────────────────────────────────────────── */}
-      <div className="sticky top-14 z-10 bg-white/90 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-2xl mx-auto px-4 pt-3 pb-3">
+      {/* ── Sticky header ─────────────────────────────────── */}
+      <div className="sticky top-14 z-10 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-2xl mx-auto px-4 pt-3 pb-2 space-y-2.5">
 
-          {/* Status line */}
-          <div className="flex items-center gap-2 mb-2.5">
-            <span className="text-xs text-slate-400">{filtered.length} work orders</span>
-            {!isOnline && (
-              <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold">
-                <WifiOff className="h-3 w-3" /> Offline
-              </span>
-            )}
-            {pendingCount > 0 && <span className="text-[11px] text-blue-600 font-semibold">{pendingCount} syncing</span>}
-            {failedCount  > 0 && <span className="text-[11px] text-red-600 font-semibold">{failedCount} failed</span>}
+          {/* Row 1: search + view toggle */}
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search jobs, sites, companies…"
+                className="pl-9 pr-8 rounded-xl bg-slate-50 border-0 focus-visible:ring-1 h-10 text-sm"
+              />
+              {search && (
+                <button onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-slate-400 text-white text-[10px] flex items-center justify-center"
+                  aria-label="Clear search">×</button>
+              )}
+            </div>
+
+            {/* View toggle */}
+            <div className="flex bg-slate-100 rounded-xl p-0.5 gap-0.5 flex-shrink-0">
+              {[
+                { id: 'cards',    Icon: LayoutGrid,   label: 'Cards' },
+                { id: 'list',     Icon: List,         label: 'List' },
+                { id: 'calendar', Icon: CalendarDays, label: 'Calendar' },
+              ].map(({ id, Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  aria-label={label}
+                  className={cn(
+                    'h-9 w-9 rounded-lg flex items-center justify-center transition-all',
+                    view === id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search jobs, sites, addresses…"
-              className="pl-9 pr-9 rounded-xl bg-slate-50 border-0 focus-visible:ring-1 h-11"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-slate-300 text-white text-xs flex items-center justify-center"
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          {/* Filter chips — horizontally scrollable, no scrollbar */}
-          <div
-            className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {STATUS_FILTERS.map(f => {
-              const isActive = activeFilter === f.value;
-              const count = getFilterCount(jobs, f.value);
-              return (
+          {/* Row 2: status chips + advanced filter toggle */}
+          <div className="flex items-center gap-1.5">
+            <div
+              className="flex gap-1.5 overflow-x-auto flex-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {STATUS_CHIPS.map(f => (
                 <button
                   key={f.value}
-                  onClick={() => setActiveFilter(f.value)}
+                  onClick={() => setStatusFilter(f.value)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0',
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-500'
+                    'flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex-shrink-0',
+                    statusFilter === f.value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
                   )}
                 >
                   {f.label}
-                  <span className={cn(
-                    'rounded-full px-1.5 text-[10px] font-bold leading-5',
-                    isActive ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
+                  <span className={cn('text-[10px] font-black px-1 rounded-full',
+                    statusFilter === f.value ? 'bg-white/20 text-white' : 'text-slate-400'
                   )}>
-                    {count}
+                    {allJobs.filter(j => matchesStatus(j, f.value)).length}
                   </span>
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Advanced filters toggle */}
+            <button
+              onClick={() => setShowAdvanced(v => !v)}
+              className={cn(
+                'flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-bold flex-shrink-0 transition-all',
+                showAdvanced || activeFilterCount > 0
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-500 border-slate-200'
+              )}
+              aria-label="Advanced filters"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              {activeFilterCount > 0 && (
+                <span className="bg-white/20 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Row 3: advanced filters (expandable) */}
+          {showAdvanced && (
+            <div className="grid grid-cols-3 gap-2 pb-1">
+              {/* Priority */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Priority</p>
+                <select
+                  value={priorityFilter}
+                  onChange={e => setPriorityFilter(e.target.value)}
+                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
+                >
+                  {PRIORITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+
+              {/* Date */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Date</p>
+                <select
+                  value={dateFilter}
+                  onChange={e => setDateFilter(e.target.value)}
+                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
+                >
+                  {DATE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+
+              {/* Technician */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Technician</p>
+                <select
+                  value={techFilter}
+                  onChange={e => setTechFilter(e.target.value)}
+                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
+                >
+                  <option value="all">All Techs</option>
+                  {techs.map(([email, name]) => (
+                    <option key={email} value={email}>{name || email}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reset link */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => { setPriorityFilter('all'); setDateFilter('all'); setTechFilter('all'); }}
+                  className="col-span-3 text-xs text-red-500 font-semibold flex items-center gap-1 justify-center mt-0.5"
+                >
+                  <X className="h-3 w-3" /> Clear advanced filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Status line */}
+          <div className="flex items-center gap-2 pb-0.5">
+            <span className="text-[11px] text-slate-400">{filtered.length} work order{filtered.length !== 1 ? 's' : ''}</span>
+            {dbJobs.length === 0 && !isLoading && (
+              <span className="text-[10px] font-semibold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">Demo data</span>
+            )}
+            {!isOnline && (
+              <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold ml-auto">
+                <WifiOff className="h-3 w-3" /> Offline
+              </span>
+            )}
+            {pendingCount > 0 && <span className="text-[11px] text-blue-600 font-semibold ml-auto">{pendingCount} syncing</span>}
+            {failedCount  > 0 && <span className="text-[11px] text-red-600 font-semibold">{failedCount} failed</span>}
           </div>
         </div>
       </div>
 
-      {/* Offline banner */}
       {!isOnline && <OfflineBanner pendingCount={pendingCount} />}
 
-      {/* Pull-to-refresh indicator */}
       {isRefreshing && (
         <div className="flex justify-center items-center gap-2 py-2.5 bg-blue-50 text-blue-600 text-xs font-medium">
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          Refreshing…
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Refreshing…
         </div>
       )}
 
-      {/* ── Job list ─────────────────────────────────────────────── */}
+      {/* ── Content ───────────────────────────────────────── */}
       <div
         ref={listRef}
-        className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 pb-32"
+        className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 pb-28"
         onTouchStart={onPullStart}
         onTouchEnd={onPullEnd}
       >
-        {jobs.length > 0 && !isLoading && (
-          <p className="text-center text-[11px] text-slate-300 mb-3 select-none">
-            ← swipe to start &nbsp;·&nbsp; swipe to navigate →
-          </p>
-        )}
-
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState search={search} filter={activeFilter} isOnline={isOnline} />
-        ) : (
-          <div className="space-y-3">
-            {filtered.map(job => (
-              <JobCard
-                key={job.id}
-                job={job}
-                onStartTimer={handleStartTimer}
-                isStarting={startingJobId === job.id}
-              />
-            ))}
+          <EmptyState isOnline={isOnline} />
+        ) : view === 'cards' ? (
+          <div className="space-y-4">
+            {filtered.map(job => <JobRichCard key={job.id} job={job} />)}
           </div>
+        ) : view === 'list' ? (
+          <div className="space-y-2">
+            {filtered.map(job => <JobListRow key={job.id} job={job} />)}
+          </div>
+        ) : (
+          <JobsCalendar jobs={filtered} />
         )}
       </div>
 
-      {/* ── Bottom FAB: Quick Evidence Capture ───────────────────── */}
+      {/* ── FAB ───────────────────────────────────────────── */}
       <div className="fixed bottom-20 right-4 z-20">
         <button
           onClick={() => toast.info('Select an active job to capture evidence', { duration: 2500 })}
@@ -238,33 +395,6 @@ export default function Jobs() {
           <Camera className="h-6 w-6 text-white" />
         </button>
       </div>
-    </div>
-  );
-}
-
-function EmptyState({ search, filter, isOnline }) {
-  if (!isOnline && !search) {
-    return (
-      <div className="text-center py-16">
-        <div className="h-16 w-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
-          <WifiOff className="h-8 w-8 text-amber-400" />
-        </div>
-        <p className="text-slate-700 font-semibold">You're offline</p>
-        <p className="text-slate-400 text-sm mt-1">Showing cached jobs — pull down to retry</p>
-      </div>
-    );
-  }
-  return (
-    <div className="text-center py-16">
-      <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-        <Briefcase className="h-8 w-8 text-slate-300" />
-      </div>
-      <p className="text-slate-600 font-semibold">
-        {search ? `No results for "${search}"` : 'No jobs here'}
-      </p>
-      <p className="text-slate-400 text-sm mt-1">
-        {filter !== 'all' ? 'Try a different filter' : 'Assigned jobs will appear here'}
-      </p>
     </div>
   );
 }
