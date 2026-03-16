@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { MOCK_PROFILE } from '@/lib/mockData';
+import { MOCK_JOBS } from '@/lib/mockJobs';
 import { format } from 'date-fns';
 
 // ── Helpers ──────────────────────────────────────────────────────────
