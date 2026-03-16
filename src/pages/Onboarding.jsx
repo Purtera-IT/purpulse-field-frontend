@@ -150,6 +150,7 @@ export default function Onboarding() {
         {currentStep === 'welcome'     && <WelcomeStep user={user} onNext={nextStep} />}
         {currentStep === 'device'      && <DeviceRegistration onNext={nextStep} />}
         {currentStep === 'permissions' && <PermissionsSetup onNext={nextStep} />}
+        {currentStep === 'location'    && <LocationConsentStep onNext={nextStep} />}
         {currentStep === 'role'        && <RolesScreen currentRole={user?.role || 'field_tech'} onNext={nextStep} isOnboarding />}
         {currentStep === 'tutorial'    && <TutorialSlides onDone={finish} />}
       </div>
