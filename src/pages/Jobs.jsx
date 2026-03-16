@@ -114,37 +114,20 @@ export default function Jobs() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
-      {/* ── Sticky header ────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-2xl mx-auto px-4 pt-5 pb-3">
+      {/* ── Filters header ────────────────────────────────────────── */}
+      <div className="sticky top-14 z-10 bg-white/90 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-2xl mx-auto px-4 pt-3 pb-3">
 
-          {/* Title + status */}
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Jobs</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-slate-400">{filtered.length} work orders</span>
-                {!isOnline && (
-                  <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold">
-                    <WifiOff className="h-3 w-3" /> Offline
-                  </span>
-                )}
-                {pendingCount > 0 && (
-                  <span className="text-[11px] text-blue-600 font-semibold">{pendingCount} syncing</span>
-                )}
-                {failedCount > 0 && (
-                  <span className="text-[11px] text-red-600 font-semibold">{failedCount} failed</span>
-                )}
-              </div>
-            </div>
-            <div className={cn(
-              'h-9 w-9 rounded-full flex items-center justify-center transition-colors',
-              isOnline ? 'bg-slate-900' : 'bg-amber-500'
-            )}>
-              {isOnline
-                ? <Briefcase className="h-4 w-4 text-white" />
-                : <WifiOff className="h-4 w-4 text-white" />}
-            </div>
+          {/* Status line */}
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-xs text-slate-400">{filtered.length} work orders</span>
+            {!isOnline && (
+              <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold">
+                <WifiOff className="h-3 w-3" /> Offline
+              </span>
+            )}
+            {pendingCount > 0 && <span className="text-[11px] text-blue-600 font-semibold">{pendingCount} syncing</span>}
+            {failedCount  > 0 && <span className="text-[11px] text-red-600 font-semibold">{failedCount} failed</span>}
           </div>
 
           {/* Search */}
