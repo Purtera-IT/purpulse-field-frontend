@@ -267,6 +267,7 @@ export default function AdminManifest() {
     { id: 'labels',    label: 'Labels',   icon: Tag },
     { id: 'meetings',  label: 'Meetings', icon: Calendar },
     { id: 'snapshots', label: 'Snapshots',icon: Database },
+    { id: 'timeline',  label: 'Timeline', icon: Clock },
   ];
 
   return (
