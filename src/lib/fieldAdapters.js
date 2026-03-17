@@ -182,33 +182,57 @@ export class Base44UploadAdapter {
 // ── Label Adapter ──────────────────────────────────────────────────────
 export class Base44LabelAdapter {
   async createLabel(data, actorEmail = 'system') {
-    const record = await base44.entities.LabelRecord.create(data);
-    await writeAudit({
-      action_type: 'label_applied',
-      entity_type: 'label_record',
-      entity_id:   record.id,
-      actor_email: actorEmail,
-      job_id:      data.job_id,
-      payload: {
-        label_type:  data.label_type,
-        label_value: data.label_value,
-        confidence:  data.confidence,
-        evidence_id: data.evidence_id,
-      },
-    });
-    return record;
+    try {
+      const record = await base44.entities.LabelRecord.create(data);
+      const validated = validateLabelRecord(record);
+
+      if (!validated.success) {
+        console.warn('[Label] LabelRecord validation failed:', validated.errors);
+      }
+
+      await writeAudit({
+        action_type: 'label_applied',
+        entity_type: 'label_record',
+        entity_id:   record.id || 'unknown',
+        actor_email: actorEmail,
+        job_id:      data.job_id,
+        payload: {
+          label_type:  data.label_type,
+          label_value: data.label_value,
+          confidence:  data.confidence,
+          evidence_id: data.evidence_id,
+        },
+      });
+
+      return validated.success ? validated.data : record;
+    } catch (err) {
+      console.error('[Label] createLabel failed:', err);
+      throw err;
+    }
   }
 
   async updateLabel(id, data, actorEmail = 'system') {
-    const record = await base44.entities.LabelRecord.update(id, data);
-    await writeAudit({
-      action_type: data.approved_for_training !== undefined ? 'label_approved' : 'label_applied',
-      entity_type: 'label_record',
-      entity_id:   id,
-      actor_email: actorEmail,
-      payload:     data,
-    });
-    return record;
+    try {
+      const record = await base44.entities.LabelRecord.update(id, data);
+      const validated = validateLabelRecord(record);
+
+      if (!validated.success) {
+        console.warn('[Label] updateLabel validation failed:', validated.errors);
+      }
+
+      await writeAudit({
+        action_type: data.approved_for_training !== undefined ? 'label_approved' : 'label_applied',
+        entity_type: 'label_record',
+        entity_id:   id,
+        actor_email: actorEmail,
+        payload:     data,
+      });
+
+      return validated.success ? validated.data : record;
+    } catch (err) {
+      console.error('[Label] updateLabel failed:', err);
+      throw err;
+    }
   }
 }
 
