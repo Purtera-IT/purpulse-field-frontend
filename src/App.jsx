@@ -1,4 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
+import FieldJobs       from './pages/FieldJobs';
+import FieldJobDetail  from './pages/FieldJobDetail';
+import AdminDevPanel   from './pages/AdminDevPanel';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
