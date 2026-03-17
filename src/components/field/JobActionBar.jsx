@@ -178,10 +178,12 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
             onClick={handleTimer}
             disabled={isReadOnly || fire.isPending}
             className={cn(
-              'flex items-center gap-1.5 h-10 px-2.5 rounded-md transition-all flex-shrink-0 min-w-[110px] disabled:opacity-50',
-              timerBg
+              'flex items-center gap-1.5 h-12 px-2.5 rounded-md transition-all flex-shrink-0 min-w-[110px] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-1',
+              timerBg,
+              'focus:ring-slate-600'
             )}
             aria-label={timerLabel + ' timer'}
+            aria-live="polite"
           >
             <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', state !== 'idle' ? 'bg-white/70' : 'bg-white/30')} />
             <div className="flex flex-col items-start leading-none">
