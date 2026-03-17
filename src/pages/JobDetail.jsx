@@ -116,8 +116,10 @@ export default function JobDetail() {
 
         {/* Status badges row */}
         <div className="px-3 py-1 flex items-center gap-1 flex-wrap">
-          <StatusBadge status={job.status} />
-          <SyncBadge  status={job.sync_status} />
+          <div aria-label="Status and sync information">
+            <StatusBadge status={job.status} />
+            <SyncBadge  status={job.sync_status} />
+          </div>
           {job.company_name && (
             <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[120px]">{job.company_name}</span>
           )}
