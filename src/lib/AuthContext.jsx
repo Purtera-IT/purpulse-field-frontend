@@ -94,18 +94,40 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       setUser(currentUser);
+      cacheUserForOffline(currentUser); // Cache for offline access
       setIsAuthenticated(true);
+      setAuthError(null);
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
+      
+      // Try offline fallback if cached user exists and offline mode allowed
+      const cachedUser = getCachedUserForOffline();
+      if (cachedUser) {
+        console.warn('[Auth] Token invalid but cached user available — allowing read-only access');
+        setUser(cachedUser);
+        setIsAuthenticated(true);
+        setAuthError({
+          type: 'offline_mode',
+          message: 'Offline mode — read-only access',
+        });
+        setIsLoadingAuth(false);
+        return;
+      }
+
       setIsAuthenticated(false);
       
-      // If user auth fails, it might be an expired token
+      // If user auth fails, it's likely an expired token
       if (error.status === 401 || error.status === 403) {
         setAuthError({
           type: 'auth_required',
-          message: 'Authentication required'
+          message: error.message || 'Authentication required'
+        });
+      } else {
+        setAuthError({
+          type: 'auth_error',
+          message: error.message || 'Failed to verify authentication'
         });
       }
     }
