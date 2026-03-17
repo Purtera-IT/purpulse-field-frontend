@@ -1,8 +1,20 @@
 /**
  * Field App Adapter Layer
  * All components accept adapter props; swap Base44 adapters for any backend.
+ * Includes runtime validation to prevent crashes from malformed API responses.
  */
 import { base44 } from '@/api/base44Client';
+import {
+  validateJob,
+  validateJobs,
+  validateEvidence,
+  validateEvidenceList,
+  validateActivity,
+  validateActivityList,
+  validateLabelRecord,
+  validateAuditLog,
+  validateAuditLogList,
+} from '@/lib/validation/validator';
 
 // ── Internal audit writer ─────────────────────────────────────────────
 async function writeAudit(entry) {
