@@ -255,7 +255,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
               </button>
               <button
                 onClick={() => setShowStop(true)}
-                className="flex-1 h-12 rounded-md bg-red-600 text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
+                className="flex-1 h-12 rounded-md bg-red-600 text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2"
                 aria-label="End work session"
               >
                 <Square className="h-4 w-4" aria-hidden="true" /> End Session
