@@ -55,6 +55,10 @@ export default function EvidenceCapture({ jobId, evidenceType, stepId, onCapture
   };
 
   const handleMetadataSubmit = (metadata) => {
+    // Track telemetry
+    const fileSizeKB = Math.round(capturedFile?.size / 1024 || 0);
+    telemetryEvidenceUploadStart(jobId, evidenceType || 'general', fileSizeKB);
+    
     addToQueue(
       [capturedFile],
       { ...metadata, tags: metadata.tags.length ? metadata.tags : [evidenceType || 'general'], runbook_step_id: stepId || null },
