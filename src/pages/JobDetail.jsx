@@ -183,10 +183,10 @@ export default function JobDetail() {
         {/* Compact timer strip (tap to expand) */}
         {isActive && !isReadOnly && activeTab !== 'time' && (
           <div
-            className="flex items-center gap-3 bg-emerald-600 text-white rounded-[8px] px-4 py-2.5 cursor-pointer active:opacity-90"
+            className="flex items-center gap-2 bg-emerald-600 text-white rounded-[6px] px-3 py-1.5 cursor-pointer active:opacity-90"
             onClick={() => setActiveTab('time')}
           >
-            <span className="h-2 w-2 rounded-full bg-emerald-300 motion-safe:animate-pulse flex-shrink-0" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 motion-safe:animate-pulse flex-shrink-0" />
             <TimerPanel jobId={job.id} statusLabel={statusLabel} compact />
             <span className="text-[10px] opacity-60 ml-auto flex-shrink-0">tap →</span>
           </div>
