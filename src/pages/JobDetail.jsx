@@ -167,7 +167,7 @@ export default function JobDetail() {
       </div>
 
       {/* ══ MOBILE: tab-based single column ══════════════════ */}
-      <div className="lg:hidden flex-1 max-w-lg mx-auto w-full px-4 py-3 pb-36 space-y-3">
+      <div className="lg:hidden flex-1 max-w-lg mx-auto w-full px-3 py-2 pb-32 space-y-2">
         {isReadOnly && (
           <div className="p-3 bg-blue-50 rounded-[8px] text-xs text-blue-700 font-semibold text-center border border-blue-100 flex items-center justify-center gap-2">
             <span className="text-emerald-600">✓</span> Submitted — view only
