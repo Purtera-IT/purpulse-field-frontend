@@ -37,18 +37,16 @@ export async function reportError({
     console.groupEnd();
   }
 
-  // Send to APM (Sentry placeholder)
+  // Send to Sentry
   if (!isTest) {
     try {
-      // TODO: Integrate with Sentry or similar APM
-      // await fetch('/api/errors', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(errorPayload),
-      // });
-      console.log('[APM] Error would be reported:', errorPayload);
+      captureError(error, {
+        context,
+        severity,
+        extra: { ...extra, errorInfo, userInitiated },
+      });
     } catch (e) {
-      console.error('[APM] Failed to report error:', e);
+      console.error('[Sentry] Failed to report error:', e);
     }
   }
 
