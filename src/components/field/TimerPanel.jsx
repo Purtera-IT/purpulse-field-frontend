@@ -219,7 +219,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           {activeState.state === 'on_break' && (
             <button
               onClick={() => fire('break_end', 'Break ended')}
-              className="flex-1 h-12 rounded-md bg-[#0E8A5F] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
+              className="flex-1 h-12 rounded-md bg-[#0E8A5F] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#0E8A5F] focus:ring-offset-2"
               aria-label="End break"
             >
               <Play className="h-4 w-4" /> Resume
