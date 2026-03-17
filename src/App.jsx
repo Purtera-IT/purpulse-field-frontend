@@ -12,6 +12,11 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { attachRetryInterceptor } from '@/lib/axiosRetry';
+import { initSentry } from '@/lib/sentry';
+import TelemetryConsent from '@/components/TelemetryConsent';
+
+// Initialize Sentry for error tracking
+initSentry();
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
