@@ -93,6 +93,10 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
   const handleComplete = () => {
     if (!canComplete) return;
     setStatus('done');
+    
+    // Track telemetry
+    telemetryRunbookStepComplete(task.job_id, task.title, 0); // Duration would need startTime tracking
+    
     onComplete?.(task.id);
     toast.success(`✓ ${task.title}`, { duration: 2500 });
   };
