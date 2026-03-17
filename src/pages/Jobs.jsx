@@ -296,7 +296,7 @@ export default function Jobs() {
       </div>
 
       {isRefreshing && (
-        <div className="flex justify-center items-center gap-2 py-2.5 bg-blue-50 text-blue-600 text-xs font-medium">
+        <div className="sticky top-[160px] z-30 flex justify-center items-center gap-2 py-2.5 bg-blue-50 text-blue-600 text-xs font-medium">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Refreshing…
         </div>
       )}
