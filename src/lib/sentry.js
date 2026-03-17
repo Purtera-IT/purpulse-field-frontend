@@ -126,7 +126,7 @@ export function setUserContext(user) {
  * Set app context
  */
 export function setAppContext(context) {
-  if (!SENTRY_DSN) return;
+  if (!Sentry || !SENTRY_DSN) return;
   Sentry.setContext('app', context);
 }
 
