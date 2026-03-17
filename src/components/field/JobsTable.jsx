@@ -99,15 +99,20 @@ export default function JobsTable({ jobs, total, page, pageSize, sort, onSort, o
 
       <div className="bg-white rounded-[8px] border border-slate-200 overflow-hidden shadow-[0_2px_6px_rgba(15,23,36,0.06)]">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse" role="grid" aria-label="Jobs list" aria-rowcount={total}>
             <thead>
-              <tr>
+              <tr role="row">
                 {/* Checkbox */}
-                <th className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 w-9">
-                  <button onClick={toggleAll} aria-label="Select all" className="flex items-center justify-center">
+                <th scope="col" className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 w-9" role="columnheader">
+                  <button
+                    onClick={toggleAll}
+                    aria-label={allSelected ? 'Deselect all rows' : 'Select all rows'}
+                    aria-pressed={allSelected}
+                    className="flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#0B2D5C] focus-visible:outline-offset-2 rounded"
+                  >
                     {allSelected
                       ? <CheckSquare className="h-4 w-4 text-[#0B2D5C]" />
-                      : <Square className="h-4 w-4 text-slate-300" />}
+                      : <Square className="h-4 w-4 text-slate-400" aria-hidden="true" />}
                   </button>
                 </th>
                 <Th col="status"         label="Status"       sort={sort} onSort={onSort} />
@@ -117,7 +122,7 @@ export default function JobsTable({ jobs, total, page, pageSize, sort, onSort, o
                 <Th col="scheduled_date" label="Scheduled"    sort={sort} onSort={onSort} />
                 <Th col="priority"       label="Priority"     sort={sort} onSort={onSort} />
                 <Th                      label="Deliverables" />
-                <Th                      label="" />
+                <Th                      label="Actions" />
               </tr>
             </thead>
             <tbody>

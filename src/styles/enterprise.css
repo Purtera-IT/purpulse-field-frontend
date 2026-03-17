@@ -139,3 +139,75 @@
 .density-compact .h-12 { height: 32px !important; }
 .density-compact .h-11 { height: 30px !important; }
 .density-compact .h-10 { height: 28px !important; }
+
+/* ── Accessibility: focus rings ───────────────────────────────────── */
+/*
+ * Global visible focus ring — supplements globals.css :focus-visible.
+ * Uses a high-contrast 2px solid ring on all interactive elements.
+ * Works for both enterprise and brand themes.
+ */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[role="row"]:focus-visible,
+[role="gridcell"]:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0B66B2 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* Brand theme uses brand purple/indigo for focus */
+.theme-brand button:focus-visible,
+.theme-brand a:focus-visible,
+.theme-brand [role="button"]:focus-visible {
+  outline-color: #4F46E5 !important;
+}
+
+/* ── Accessibility: colour contrast fixes ─────────────────────────── */
+/*
+ * Several Tailwind slate-300/400 text colours on white fail AA (4.5:1).
+ * Bump caption and meta text to slate-500 minimum (contrast ~3.9 → use
+ * slate-600 = #475569 which passes AA at 5.9:1 on white).
+ */
+.text-slate-300 { color: #64748b !important; }   /* slate-500 — was too light */
+.text-slate-400 { color: #475569 !important; }   /* slate-600 for AA on white */
+
+/* Status pill text — ensure inner text meets 4.5:1 on badge backgrounds */
+/* bg-slate-100 (#f1f5f9) with text-slate-600 (#475569) = 5.9:1 ✓ */
+/* bg-amber-50  (#fffbeb) with text-amber-700 (#b45309) = 5.2:1 ✓ */
+/* bg-red-50    (#fef2f2) with text-red-700   (#b91c1c) = 5.8:1 ✓ */
+/* bg-emerald-50(#ecfdf5) with text-emerald-700(#047857)= 5.1:1 ✓ */
+/* These are already compliant — no override needed. */
+
+/* ── prefers-reduced-motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* Kill all CSS transitions and animations */
+  *,
+  *::before,
+  *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    transition-delay:          0ms    !important;
+    scroll-behavior:           auto   !important;
+  }
+
+  /* Specifically stop pulsing status dots and sync spinners */
+  .animate-pulse,
+  .motion-safe\:animate-pulse {
+    animation: none !important;
+  }
+  .animate-spin {
+    animation: none !important;
+  }
+
+  /* Stop progress bar transitions */
+  [class*="transition-all"],
+  [class*="transition-colors"],
+  [class*="transition-opacity"] {
+    transition: none !important;
+  }
+}
