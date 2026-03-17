@@ -268,6 +268,34 @@ export default function Profile() {
           <SettingRow icon={Info}       label="App Version" sub="v2.4.1 · build 241" iconCls="text-slate-400" />
         </SectionCard>
 
+        {/* ── Display Preferences ──────────────────────── */}
+        <SectionCard title="Display Preferences">
+          <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
+                <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Density</p>
+                <p className="text-[11px] text-slate-400">Information density of the interface</p>
+              </div>
+            </div>
+            <DensityToggle value={density} onChange={setDensity} />
+          </div>
+          <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
+                <Palette className="h-4 w-4 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Theme</p>
+                <p className="text-[11px] text-slate-400">Visual style of the application</p>
+              </div>
+            </div>
+            <ThemeToggle value={theme} onChange={setTheme} />
+          </div>
+        </SectionCard>
+
         {/* ── Logout ───────────────────────────────────── */}
         <button
           onClick={() => base44.auth.logout()}
