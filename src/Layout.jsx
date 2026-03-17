@@ -10,7 +10,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Briefcase, Clock, MessageCircle, HelpCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import TopBar from './components/shell/TopBar';
+
 import { useAppPreferences } from './hooks/useAppPreferences';
 
 // Default density — can be overridden by localStorage or appPublicSettings.density
