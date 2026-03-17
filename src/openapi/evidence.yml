@@ -1,0 +1,248 @@
+openapi: "3.0.3"
+info:
+  title: Purpulse Field API — Evidence & Closeout
+  version: "1.1.0"
+  description: >
+    Evidence lifecycle (create → upload → process) and job closeout endpoints
+    including runbook-gating and override path.
+
+servers:
+  - url: https://api.purpulse.io/api/v1
+    description: Production
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── Evidence ────────────────────────────────────────────────────
+    EvidenceCreate:
+      type: object
+      required: [job_id, evidence_type, content_type, size_bytes]
+      properties:
+        job_id:         { type: string }
+        evidence_type:  { type: string, example: before_photo }
+        content_type:   { type: string, example: image/jpeg }
+        size_bytes:     { type: integer, example: 3145728 }
+        runbook_step_id:{ type: string, nullable: true }
+        notes:          { type: string, nullable: true }
+        captured_at:    { type: string, format: date-time }
+        geo_lat:        { type: number, nullable: true }
+        geo_lon:        { type: number, nullable: true }
+        client_event_id:{ type: string, description: Idempotency key }
+
+    EvidenceCreateResponse:
+      type: object
+      properties:
+        evidence_id: { type: string }
+        sas_url:
+          type: string
+          description: Short-lived pre-signed PUT URL for direct blob upload (TTL 15 min)
+        expires_at:  { type: string, format: date-time }
+
+    EvidenceComplete:
+      type: object
+      required: [checksum_sha256]
+      properties:
+        checksum_sha256:
+          type: string
+          description: SHA-256 of the uploaded file for server-side validation
+        upload_duration_ms: { type: integer }
+
+    EvidenceProcessResult:
+      type: object
+      required: [evidence_id]
+      properties:
+        evidence_id:           { type: string }
+        thumbnail_url:         { type: string, nullable: true }
+        ocr_text:              { type: string, nullable: true }
+        embedding_vector:
+          type: array
+          items: { type: number }
+          description: 1536-dim float array (text-embedding-3-small)
+          nullable: true
+        embedding_model:       { type: string, nullable: true, example: text-embedding-3-small }
+        quality_score:         { type: number, minimum: 0, maximum: 100, nullable: true }
+        quality_flags:
+          type: object
+          nullable: true
+          properties:
+            blur:       { type: boolean }
+            dark:       { type: boolean }
+            obstructed: { type: boolean }
+        face_redaction_status:
+          type: object
+          nullable: true
+          properties:
+            faces_detected: { type: integer }
+            redacted:       { type: boolean }
+            redacted_url:   { type: string, nullable: true }
+        status:
+          type: string
+          enum: [processed, failed]
+        error:
+          type: string
+          nullable: true
+
+    # ── Closeout ─────────────────────────────────────────────────────
+    CloseoutRequest:
+      type: object
+      properties:
+        signoff_signer_name:  { type: string }
+        signoff_signer_title: { type: string }
+        signoff_signature_url:{ type: string }
+        signoff_csat:         { type: integer, minimum: 1, maximum: 5 }
+        signoff_notes:        { type: string }
+
+    CloseoutOverrideRequest:
+      allOf:
+        - $ref: '#/components/schemas/CloseoutRequest'
+        - type: object
+          required: [override_reason]
+          properties:
+            override_reason:
+              type: string
+              description: Mandatory reason recorded in audit_log when bypassing runbook gates
+
+    Error:
+      type: object
+      properties:
+        code:    { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+
+paths:
+  # ── Evidence creation (returns SAS URL for direct upload) ─────────
+  /evidence:
+    post:
+      operationId: createEvidence
+      summary: Create evidence metadata and receive a SAS upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvidenceCreate' }
+      responses:
+        "201":
+          description: Evidence record created, SAS URL ready for PUT upload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceCreateResponse' }
+        "400": { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        "401": { description: Unauthorized }
+
+  # ── Client confirms blob upload complete ──────────────────────────
+  /evidence/{id}/complete:
+    post:
+      operationId: completeEvidenceUpload
+      summary: Signal that the client PUT upload is complete; triggers processing pipeline
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvidenceComplete' }
+      responses:
+        "200":
+          description: Upload confirmed; evidence status transitions to processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: processing }
+        "400":
+          description: Checksum mismatch or SAS expired
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        "404": { description: Evidence not found }
+
+  # ── Worker posts ML results ───────────────────────────────────────
+  /evidence/{id}/process-result:
+    post:
+      operationId: postEvidenceProcessResult
+      summary: Worker (Azure Function) posts OCR/embedding/thumbnail results
+      description: >
+        Called by the processEvidence Azure Function after ML pipeline completes.
+        Caller must present a service-level bearer token (BACKEND_API_TOKEN env var).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvidenceProcessResult' }
+      responses:
+        "200":
+          description: Results written; evidence status set to processed
+        "400": { description: Validation error }
+        "401": { description: Unauthorized — invalid service token }
+        "404": { description: Evidence not found }
+
+  # ── Job closeout (with runbook gating) ───────────────────────────
+  /jobs/{id}/closeout:
+    post:
+      operationId: submitCloseout
+      summary: Submit job closeout; server validates all required evidence is present
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: override
+          required: false
+          schema: { type: boolean, default: false }
+          description: >
+            Set true to bypass missing-evidence gate. Requires override_reason in body.
+            Action is recorded in audit_log with actor, reason, and before/after state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CloseoutRequest'
+                - $ref: '#/components/schemas/CloseoutOverrideRequest'
+      responses:
+        "200":
+          description: Closeout submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:        { type: string }
+                  status:        { type: string, example: submitted }
+                  submitted_at:  { type: string, format: date-time }
+                  audit_log_id:  { type: string, nullable: true }
+        "400":
+          description: >
+            Runbook gate failure — required evidence missing.
+            Returns list of missing evidence types.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      missing_evidence:
+                        type: array
+                        items: { type: string }
+        "403": { description: Override requested but override_reason missing }
+        "404": { description: Job not found }
