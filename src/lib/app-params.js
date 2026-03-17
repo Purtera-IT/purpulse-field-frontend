@@ -2,6 +2,18 @@ const isNode = typeof window === 'undefined';
 const windowObj = isNode ? { localStorage: new Map() } : window;
 const storage = windowObj.localStorage;
 
+/**
+ * Security: tokens passed via URL (e.g. ?access_token=...) are only honoured when
+ * VITE_ALLOW_URL_TOKEN=true is set at build time. In production builds (NODE_ENV=production)
+ * with the flag absent or false, URL tokens are silently ignored to prevent token leakage
+ * via browser history, referrer headers, and server logs.
+ *
+ * For local dev / Cypress / staging, set:  VITE_ALLOW_URL_TOKEN=true
+ */
+const allowUrlTokens =
+  import.meta.env.VITE_ALLOW_URL_TOKEN === 'true' ||
+  import.meta.env.MODE !== 'production';
+
 const toSnakeCase = (str) => {
 	return str.replace(/([A-Z])/g, '_$1').toLowerCase();
 }
@@ -20,8 +32,17 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 		window.history.replaceState({}, document.title, newUrl);
 	}
 	if (searchParam) {
-		storage.setItem(storageKey, searchParam);
-		return searchParam;
+		// Block URL-based access_token in production unless explicitly allowed
+		if (paramName === 'access_token' && !allowUrlTokens) {
+			console.warn(
+				'[Purpulse] URL access_token ignored in production. ' +
+				'Set VITE_ALLOW_URL_TOKEN=true at build time to allow this (dev/staging only).'
+			);
+			// Fall through to stored/default value — do NOT persist the URL token
+		} else {
+			storage.setItem(storageKey, searchParam);
+			return searchParam;
+		}
 	}
 	if (defaultValue) {
 		storage.setItem(storageKey, defaultValue);
