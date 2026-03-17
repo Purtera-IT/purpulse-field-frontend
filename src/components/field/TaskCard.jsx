@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import DeliverableItem from './deliverables/DeliverableItem';
+import { telemetryRunbookStepComplete } from '@/lib/telemetry';
 
 const GATE_CFG = {
   blocking: { bg: 'bg-red-500',   label: 'Blocking', tip: 'Cannot proceed until complete' },
