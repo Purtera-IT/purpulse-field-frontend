@@ -99,23 +99,37 @@ export default function JobOverview({ job, evidence, adapters, onRefresh }) {
         </div>
         {job.description && <p className="text-xs text-slate-600 leading-relaxed">{job.description}</p>}
         <div className="flex flex-wrap gap-2 pt-1">
-          {canStart && (
+          {canStart && permissions?.canCompleteJob && (
             <button onClick={() => handleStatusChange('in_progress')} disabled={updateMutation.isPending}
               className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">
               <Play className="h-3.5 w-3.5" /> Start Job
             </button>
           )}
-          {canComplete && (
+          {canStart && !permissions?.canCompleteJob && (
+            <button disabled title="Permission required"
+              className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed">
+              <Lock className="h-3.5 w-3.5" /> Start Job
+            </button>
+          )}
+          {canComplete && permissions?.canCompleteJob && (
             <button onClick={() => handleStatusChange('pending_closeout')} disabled={updateMutation.isPending}
               className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
               <CheckCircle className="h-3.5 w-3.5" /> Complete Job
             </button>
           )}
-          <button onClick={handleSnapshotSOW} disabled={snapshotting}
-            className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-slate-900 text-white text-xs font-bold hover:bg-slate-700 disabled:opacity-50 transition-colors">
-            <FileText className="h-3.5 w-3.5" />
-            {snapshotting ? 'Snapshotting…' : 'Snapshot SOW'}
-          </button>
+          {canComplete && !permissions?.canCompleteJob && (
+            <button disabled title="Permission required"
+              className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed">
+              <Lock className="h-3.5 w-3.5" /> Complete Job
+            </button>
+          )}
+          {permissions?.canEditJob && (
+            <button onClick={handleSnapshotSOW} disabled={snapshotting}
+              className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-slate-900 text-white text-xs font-bold hover:bg-slate-700 disabled:opacity-50 transition-colors">
+              <FileText className="h-3.5 w-3.5" />
+              {snapshotting ? 'Snapshotting…' : 'Snapshot SOW'}
+            </button>
+          )}
         </div>
       </Card>
 
