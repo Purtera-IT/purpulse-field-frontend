@@ -121,6 +121,7 @@ export default function Profile() {
   const [notifPush,  setNotifPush]  = useState(true);
   const [notifEmail, setNotifEmail] = useState(false);
   const [trackingOn, setTrackingOn] = useState(true);
+  const { density, setDensity, theme, setTheme } = useAppPreferences();
 
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => base44.auth.me(), staleTime: 60_000 });
   const profile  = { ...MOCK_PROFILE, ...(user ?? {}) };
