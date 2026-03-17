@@ -134,7 +134,7 @@ export function setAppContext(context) {
  * Add breadcrumb for user actions
  */
 export function addBreadcrumb(message, category, data = {}) {
-  if (!SENTRY_DSN) return;
+  if (!Sentry || !SENTRY_DSN) return;
   Sentry.addBreadcrumb({
     message,
     category,
