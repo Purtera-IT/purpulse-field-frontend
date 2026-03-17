@@ -221,9 +221,11 @@ export default function Jobs() {
         activeFilterCount={activeFilterCount}
       />
 
+      </div>
+
       {/* ── Advanced filters panel (expandable below header) ── */}
       {showAdvanced && (
-        <div className="max-w-2xl mx-auto w-full px-4 py-3 bg-white border-b border-slate-100">
+        <div className="sticky top-[60px] z-40 max-w-2xl mx-auto w-full px-4 py-3 bg-white border-b border-slate-100">
           <div className="grid grid-cols-3 gap-3">
             {/* Priority */}
             <div>
