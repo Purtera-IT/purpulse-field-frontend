@@ -237,7 +237,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           {activeState.state === 'idle' && (
             <button
               onClick={() => fire('work_start', 'Work started')}
-              className="w-full h-12 rounded-md bg-[#0B2D5C] text-white font-semibold text-sm flex items-center justify-center gap-2 active:opacity-80"
+              className="w-full h-12 rounded-md bg-[#0B2D5C] text-white font-semibold text-sm flex items-center justify-center gap-2 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] focus:ring-offset-2"
               aria-label="Start work"
             >
               <Play className="h-4 w-4" /> Ready to Start
