@@ -210,7 +210,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           {activeState.state === 'working' && (
             <button
               onClick={() => fire('break_start', 'Break started')}
-              className="flex-1 h-12 rounded-md bg-white/70 text-amber-700 font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-70 border border-amber-200"
+              className="flex-1 h-12 rounded-md bg-white/70 text-amber-700 font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-70 border border-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
               aria-label="Start break"
             >
               <Coffee className="h-4 w-4" /> Break
