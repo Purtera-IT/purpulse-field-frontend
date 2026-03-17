@@ -200,151 +200,25 @@ export default function Jobs() {
     }
   };
 
+  // Map sync status
+  const syncState = !isOnline ? 'offline' : pendingCount > 0 ? 'syncing' : 'synced';
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
-      {/* ── Sticky header ─────────────────────────────────── */}
-      <div className="sticky top-14 z-10 bg-white/95 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-2xl mx-auto px-4 pt-3 pb-2 space-y-2.5">
-
-          {/* Row 1: search + view toggle */}
-          <div className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search jobs, sites, companies…"
-                className="pl-9 pr-8 rounded-xl bg-slate-50 border-0 focus-visible:ring-1 h-10 text-sm"
-              />
-              {search && (
-                <button onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-slate-400 text-white text-[10px] flex items-center justify-center"
-                  aria-label="Clear search">×</button>
-              )}
-            </div>
-
-            {/* View toggle */}
-            <div className="flex bg-slate-100 rounded-xl p-0.5 gap-0.5 flex-shrink-0">
-              {[
-                { id: 'table',    Icon: Table2,       label: 'Table',    desktopOnly: false },
-                { id: 'cards',    Icon: LayoutGrid,   label: 'Cards',    desktopOnly: false },
-                { id: 'list',     Icon: List,         label: 'List',     desktopOnly: false },
-                { id: 'calendar', Icon: CalendarDays, label: 'Calendar', desktopOnly: false },
-              ].map(({ id, Icon, label }) => (
-                <button
-                  key={id}
-                  onClick={() => { setView(id); setTablePage(0); }}
-                  aria-label={label}
-                  className={cn(
-                    'h-9 w-9 rounded-lg flex items-center justify-center transition-all',
-                    view === id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Row 2: compact status filter toggles */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-              <FilterToggle
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={STATUS_CHIPS.map(f => ({
-                  value: f.value,
-                  label: f.label,
-                  count: allJobs.filter(j => matchesStatus(j, f.value)).length,
-                }))}
-              />
-            </div>
-            <button
-              onClick={() => setShowAdvanced(v => !v)}
-              className={cn(
-                'flex items-center gap-1 h-7 px-2 rounded-[4px] border text-[11px] font-semibold flex-shrink-0 transition-colors',
-                showAdvanced || activeFilterCount > 0
-                  ? 'bg-[#0F1724] text-white border-[#0F1724]'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-              )}
-              aria-label="Advanced filters"
-            >
-              <SlidersHorizontal className="h-3 w-3" />
-              {activeFilterCount > 0 && <span className="text-[10px] font-black">{activeFilterCount}</span>}
-            </button>
-          </div>
-
-          {/* Row 3: advanced filters (expandable) */}
-          {showAdvanced && (
-            <div className="grid grid-cols-3 gap-2 pb-1">
-              {/* Priority */}
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Priority</p>
-                <select
-                  value={priorityFilter}
-                  onChange={e => setPriorityFilter(e.target.value)}
-                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
-                >
-                  {PRIORITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-
-              {/* Date */}
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Date</p>
-                <select
-                  value={dateFilter}
-                  onChange={e => setDateFilter(e.target.value)}
-                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
-                >
-                  {DATE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-
-              {/* Technician */}
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Technician</p>
-                <select
-                  value={techFilter}
-                  onChange={e => setTechFilter(e.target.value)}
-                  className="w-full h-9 rounded-xl border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-slate-400 text-slate-700"
-                >
-                  <option value="all">All Techs</option>
-                  {techs.map(([email, name]) => (
-                    <option key={email} value={email}>{name || email}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Reset link */}
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={() => { setPriorityFilter('all'); setDateFilter('all'); setTechFilter('all'); }}
-                  className="col-span-3 text-xs text-red-500 font-semibold flex items-center gap-1 justify-center mt-0.5"
-                >
-                  <X className="h-3 w-3" /> Clear advanced filters
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Status line */}
-          <div className="flex items-center gap-2 pb-0.5">
-            <span className="text-[11px] text-slate-400">{filtered.length} work order{filtered.length !== 1 ? 's' : ''}</span>
-            {dbJobs.length === 0 && !isLoading && (
-              <span className="text-[10px] font-semibold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">Demo data</span>
-            )}
-            {!isOnline && (
-              <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold ml-auto">
-                <WifiOff className="h-3 w-3" /> Offline
-              </span>
-            )}
-            {pendingCount > 0 && <span className="text-[11px] text-blue-600 font-semibold ml-auto">{pendingCount} syncing</span>}
-            {failedCount  > 0 && <span className="text-[11px] text-red-600 font-semibold">{failedCount} failed</span>}
-          </div>
-        </div>
-      </div>
+      {/* ── Jobs Header (compact, professional) ── */}
+      <JobsHeader
+        jobCount={allJobs.filter(j => matchesStatus(j, 'all')).length}
+        activeFilter={statusFilter}
+        onFilterChange={(val) => { setStatusFilter(val); setTablePage(0); }}
+        view={view}
+        onViewChange={(v) => { setView(v); setTablePage(0); }}
+        query={search}
+        onSearch={setSearch}
+        syncStatus={{ state: syncState, lastUpdated: null }}
+        onAdvancedFilters={() => setShowAdvanced(v => !v)}
+        activeFilterCount={activeFilterCount}
+      />
 
       {!isOnline && <OfflineBanner pendingCount={pendingCount} />}
 
