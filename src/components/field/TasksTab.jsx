@@ -230,6 +230,18 @@ export default function TasksTab({ job }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Override modal */}
+      <TaskOverrideModal
+        isOpen={!!overrideTask}
+        onClose={() => setOverrideTask(null)}
+        onConfirm={(reason) => {
+          if (overrideTask?.phaseIdx !== undefined) {
+            handlePhaseOverride(overrideTask.phaseIdx, reason);
+          }
+        }}
+        taskTitle={overrideTask?.name || 'Phase'}
+      />
     </div>
   );
 }
