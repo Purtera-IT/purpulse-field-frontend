@@ -95,66 +95,57 @@ export default function JobDetail() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
       {/* ── Sticky header ─────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-slate-100 shadow-sm">
-        <div className="px-4 lg:px-6 pt-3 pb-0">
-          <div className="flex items-center gap-3 mb-2">
-            <Link
-              to="/Jobs"
-              className="h-8 w-8 rounded-[8px] bg-slate-100 flex items-center justify-center flex-shrink-0 active:bg-slate-200 transition-colors"
-              aria-label="Back to jobs"
-            >
-              <ArrowLeft className="h-4 w-4 text-slate-600" />
-            </Link>
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+        {/* Title + CTA row */}
+        <div className="px-3 pt-2 pb-0 flex items-center gap-2">
+          <Link
+            to="/Jobs"
+            className="h-7 w-7 rounded-[6px] bg-slate-100 flex items-center justify-center flex-shrink-0 active:bg-slate-200 transition-colors"
+            aria-label="Back to jobs"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-600" />
+          </Link>
+          <h1 className="flex-1 min-w-0 text-sm font-black text-slate-900 leading-snug line-clamp-1">{job.title}</h1>
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className="flex-shrink-0 h-7 px-2.5 rounded-[6px] bg-[#0B2D5C] text-white text-[10px] font-bold flex items-center gap-1 active:opacity-80"
+          >
+            <ClipboardList className="h-3 w-3" /> Tasks
+          </button>
+        </div>
 
-            <div className="flex-1 min-w-0">
-              <h1 className="text-sm font-black text-slate-900 leading-snug line-clamp-1">{job.title}</h1>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <StatusBadge status={job.status} />
-                <SyncBadge  status={job.sync_status} />
-                {job.company_name && (
-                  <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[120px]">{job.company_name}</span>
-                )}
-                {!dbJob && (
-                  <span className="text-[9px] font-black text-slate-300 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">DEMO</span>
-                )}
-              </div>
-            </div>
-
-            {/* Desktop: compact live-timer pill in header ─── */}
-            {isActive && (
-              <div className="hidden lg:flex items-center gap-2 bg-emerald-600 text-white rounded-[8px] px-3 py-1.5 flex-shrink-0 min-w-0">
-                <span className="h-2 w-2 rounded-full bg-emerald-300 motion-safe:animate-pulse flex-shrink-0" aria-hidden="true" />
-                <TimerPanel jobId={job.id} statusLabel={statusLabel} compact />
-              </div>
-            )}
-
-            {/* Mobile: tasks quick-jump */}
-            {isActive && (
-              <button
-                onClick={() => setActiveTab('tasks')}
-                className="lg:hidden flex-shrink-0 h-8 px-3 rounded-[8px] bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1.5 active:opacity-80"
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                Tasks
-              </button>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          {job.progress != null && (
-            <div className="h-0.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={cn('h-full rounded-full transition-all',
-                  job.progress === 100 ? 'bg-emerald-500' : job.progress >= 60 ? 'bg-blue-500' : job.progress >= 30 ? 'bg-amber-400' : 'bg-red-400'
-                )}
-                style={{ width: `${job.progress}%` }}
-              />
+        {/* Status badges row */}
+        <div className="px-3 py-1 flex items-center gap-1 flex-wrap">
+          <StatusBadge status={job.status} />
+          <SyncBadge  status={job.sync_status} />
+          {job.company_name && (
+            <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[120px]">{job.company_name}</span>
+          )}
+          {!dbJob && (
+            <span className="text-[9px] font-black text-slate-300 bg-slate-50 px-1 py-px rounded border border-slate-100">DEMO</span>
+          )}
+          {isActive && (
+            <div className="hidden lg:flex items-center gap-1.5 bg-emerald-600 text-white rounded-[6px] px-2 py-px ml-auto flex-shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 motion-safe:animate-pulse flex-shrink-0" aria-hidden="true" />
+              <TimerPanel jobId={job.id} statusLabel={statusLabel} compact />
             </div>
           )}
         </div>
 
-        {/* Tab bar — mobile only ─────────────────────────── */}
-        <div className="flex lg:hidden px-1 mt-0">
+        {/* Thin progress bar */}
+        {job.progress != null && (
+          <div className="h-0.5 bg-slate-100 overflow-hidden">
+            <div
+              className={cn('h-full transition-all',
+                job.progress === 100 ? 'bg-emerald-500' : job.progress >= 60 ? 'bg-blue-500' : job.progress >= 30 ? 'bg-amber-400' : 'bg-red-400'
+              )}
+              style={{ width: `${job.progress}%` }}
+            />
+          </div>
+        )}
+
+        {/* Tab bar — mobile only */}
+        <div className="flex lg:hidden px-1">
           {TABS.map(tab => {
             const Icon = tab.Icon;
             const active = activeTab === tab.id;
@@ -163,11 +154,11 @@ export default function JobDetail() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all text-[10px] font-bold border-b-2',
+                  'flex-1 flex items-center justify-center gap-1 py-1.5 transition-all text-[10px] font-bold border-b-2',
                   active ? 'text-slate-900 border-slate-900' : 'text-slate-400 border-transparent'
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3 w-3" />
                 {tab.label}
               </button>
             );
