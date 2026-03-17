@@ -170,7 +170,7 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
   return (
     <>
       {/* ── Bar ───────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-[0_-2px_6px_rgba(15,23,36,0.06)]">
         <div className="max-w-lg mx-auto px-3 py-2.5 flex items-center gap-2">
 
           {/* Timer block */}
@@ -178,13 +178,13 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
             onClick={handleTimer}
             disabled={isReadOnly || fire.isPending}
             className={cn(
-              'flex items-center gap-2 h-13 px-3 py-2 rounded-2xl transition-all flex-shrink-0 min-w-[100px] disabled:opacity-50',
+              'flex items-center gap-2 h-11 px-3 py-2 rounded-[8px] transition-all flex-shrink-0 min-w-[100px] disabled:opacity-50',
               timerBg
             )}
             aria-label={timerLabel + ' timer'}
           >
             <div className="flex flex-col items-start">
-              <span className={cn('h-2 w-2 rounded-full mb-0.5', state !== 'idle' ? 'bg-white/70 motion-safe:animate-pulse' : 'bg-white/30')} />
+              <span className={cn('h-1.5 w-1.5 rounded-full mb-0.5', state !== 'idle' ? 'bg-white/70' : 'bg-white/30')} />
               <span className="text-[9px] font-black opacity-80 uppercase tracking-wide">{cfg.label}</span>
             </div>
             <span className="font-mono font-black text-sm tabular-nums">{fmt(elapsed)}</span>
@@ -208,7 +208,7 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
                 key={btn.id}
                 onClick={() => setSheet(btn.id)}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-12 rounded-xl transition-all active:scale-95 gap-0.5',
+                  'flex flex-col items-center justify-center flex-1 h-11 rounded-[8px] transition-all active:scale-95 gap-0.5',
                   btn.bg
                 )}
                 aria-label={btn.label}
@@ -226,7 +226,7 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
       {stopConfirm && (
         <div className="fixed inset-0 z-50 flex items-end" role="dialog">
           <div className="absolute inset-0 bg-black/50" onClick={() => setStopConfirm(false)} />
-          <div className="relative w-full max-w-lg mx-auto bg-white rounded-t-3xl p-6 pb-10">
+          <div className="relative w-full max-w-lg mx-auto bg-white rounded-t-[12px] p-6 pb-10">
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
             <div className="text-center mb-5">
               <div className="h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
@@ -237,17 +237,17 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
             </div>
             <div className="flex gap-3">
               <button onClick={() => { handleBreak(); setStopConfirm(false); }}
-                className="flex-1 h-13 py-3.5 rounded-2xl bg-amber-50 text-amber-700 font-bold text-sm flex items-center justify-center gap-2 border border-amber-200">
+                className="flex-1 h-11 py-3 rounded-[8px] bg-amber-50 text-amber-700 font-bold text-sm flex items-center justify-center gap-2 border border-amber-200">
                 <Pause className="h-4 w-4" /> Take Break
               </button>
               <button
                 onClick={() => { haptic('stop'); fire.mutate('work_stop'); toast.success('Work session ended'); setStopConfirm(false); }}
-                className="flex-1 h-13 py-3.5 rounded-2xl bg-red-600 text-white font-bold text-sm flex items-center justify-center gap-2">
+                className="flex-1 h-11 py-3 rounded-[8px] bg-red-600 text-white font-bold text-sm flex items-center justify-center gap-2">
                 <Square className="h-4 w-4" /> End Session
               </button>
             </div>
             <button onClick={() => setStopConfirm(false)}
-              className="w-full mt-2 h-11 rounded-2xl border-2 border-slate-200 text-slate-600 font-semibold text-sm">
+              className="w-full mt-2 h-11 rounded-[8px] border-2 border-slate-200 text-slate-600 font-semibold text-sm">
               Keep Working
             </button>
           </div>
