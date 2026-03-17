@@ -131,7 +131,7 @@ function EmptyState({ isOnline }) {
 // ── Main page ────────────────────────────────────────────────────────
 export default function Jobs() {
   const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
-  const [view,           setView]           = useState(() => localStorage.getItem('purpulse_jobs_view') || (isDesktop ? 'table' : 'cards'));
+  const [view,           setView]           = useState(() => localStorage.getItem('purpulse_jobs_view') || (isDesktop ? 'table' : 'list'));
   const [search,         setSearch]         = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
