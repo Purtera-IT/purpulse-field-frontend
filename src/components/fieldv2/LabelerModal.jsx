@@ -48,7 +48,7 @@ export default function LabelerModal({
       bbox:                 bboxStr || null,
       labeled_by:           'admin@purpulse.com',
       labeled_at:           new Date().toISOString(),
-      approved_for_training: labelType === 'training_approved' || labelType === 'qc_pass',
+      approved_for_training: approvedForTraining || labelType === 'training_approved' || labelType === 'qc_pass',
       qc_status:            ['pass','qc_pass','training_approved'].includes(labelType) ? 'approved' : 'pending',
       notes:                notes || null,
     }, 'admin@purpulse.com'),
