@@ -145,7 +145,7 @@ export default function JobDetail() {
         )}
 
         {/* Tab bar — mobile only */}
-        <div className="flex lg:hidden px-1">
+        <div className="flex lg:hidden px-1 border-b border-slate-100">
           {TABS.map(tab => {
             const Icon = tab.Icon;
             const active = activeTab === tab.id;
@@ -154,11 +154,11 @@ export default function JobDetail() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-1 py-1.5 transition-all text-[10px] font-bold border-b-2',
-                  active ? 'text-slate-900 border-slate-900' : 'text-slate-400 border-transparent'
+                  'flex-1 flex items-center justify-center gap-1 py-2 transition-colors text-[12px] font-semibold border-b-2',
+                  active ? 'text-slate-900 border-b-[#0B2D5C]' : 'text-slate-500 border-transparent hover:text-slate-700'
                 )}
               >
-                <Icon className="h-3 w-3" />
+                <Icon className="h-3.5 w-3.5" />
                 {tab.label}
               </button>
             );
