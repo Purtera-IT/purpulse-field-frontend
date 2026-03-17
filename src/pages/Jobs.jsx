@@ -393,7 +393,29 @@ export default function Jobs() {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState isOnline={isOnline} />
-        ) : view === 'cards' ? (
+        ) : view === 'table' ? (() => {
+            // Client-side sort + page (mirrors server-side shape)
+            const sorted = [...filtered].sort((a, b) => {
+              const col = tableSort.col;
+              const av = a[col] ?? '', bv = b[col] ?? '';
+              const cmp = String(av).localeCompare(String(bv));
+              return tableSort.dir === 'asc' ? cmp : -cmp;
+            });
+            const pageJobs = sorted.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE);
+            return (
+              <JobsTable
+                jobs={pageJobs}
+                total={sorted.length}
+                page={tablePage}
+                pageSize={TABLE_PAGE_SIZE}
+                sort={tableSort}
+                onSort={handleTableSort}
+                onPage={setTablePage}
+                onBulkAction={(action, ids) => toast.info(`Bulk ${action} on ${ids.length} job(s) — connect to API`)}
+              />
+            );
+          })()
+        : view === 'cards' ? (
           <div className="space-y-4">
             {filtered.map(job => <JobRichCard key={job.id} job={job} />)}
           </div>
