@@ -41,26 +41,26 @@ export default function FieldJobDetail() {
   /* ── Data queries ────────────────────────────────────────────────── */
   const { data: job, isLoading } = useQuery({
     queryKey: ['fj-job', jobId],
-    queryFn:  () => apiClient.getJob(jobId!),
+    queryFn:  () => jobId ? apiClient.getJob(jobId) : Promise.resolve(null),
     enabled:  !!jobId,
     staleTime: 30_000,
   });
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['fj-evidence', jobId],
-    queryFn:  () => apiClient.getEvidence(jobId!),
+    queryFn:  () => jobId ? apiClient.getEvidence(jobId) : Promise.resolve([]),
     enabled:  !!jobId,
   });
 
   const { data: labels = [] } = useQuery({
     queryKey: ['fj-labels', jobId],
-    queryFn:  () => apiClient.getLabels(jobId!),
+    queryFn:  () => jobId ? apiClient.getLabels(jobId) : Promise.resolve([]),
     enabled:  !!jobId,
   });
 
   const { data: meetings = [] } = useQuery({
     queryKey: ['fj-meetings', jobId],
-    queryFn:  () => apiClient.getMeetings(jobId!),
+    queryFn:  () => jobId ? apiClient.getMeetings(jobId) : Promise.resolve([]),
     enabled:  !!jobId,
   });
 
