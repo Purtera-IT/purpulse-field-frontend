@@ -2,7 +2,7 @@
  * JobTimeline — merges Activity + AuditLog rows for a job
  * and renders them as a chronological timeline.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
@@ -131,7 +131,7 @@ export default function JobTimeline({ jobId }) {
 
   const isLoading = loadA || loadL;
 
-  const events = React.useMemo(() => {
+  const events = useMemo(() => {
     const actEvents = activities.map(a => ({
       ...a,
       source:   'activity',
