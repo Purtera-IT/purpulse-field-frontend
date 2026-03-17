@@ -239,26 +239,49 @@ export class Base44LabelAdapter {
 // ── Activity Adapter ───────────────────────────────────────────────────
 export class Base44ActivityAdapter {
   async logActivity(data, actorEmail = 'system') {
-    const record = await base44.entities.Activity.create(data);
-    const actionMap = {
-      clock_in:  'time_start',
-      clock_out: 'time_stop',
-      start_step:'runbook_step_complete',
-      end_step:  'runbook_step_complete',
-    };
-    await writeAudit({
-      action_type: actionMap[data.event_type] || 'time_manual_edit',
-      entity_type: 'activity',
-      entity_id:   record.id,
-      actor_email: actorEmail,
-      job_id:      data.work_order_id,
-      payload: { event_type: data.event_type, timestamp: data.timestamp },
-    });
-    return record;
+    try {
+      const record = await base44.entities.Activity.create(data);
+      const validated = validateActivity(record);
+
+      if (!validated.success) {
+        console.warn('[Activity] Activity validation failed:', validated.errors);
+      }
+
+      const actionMap = {
+        clock_in:  'time_start',
+        clock_out: 'time_stop',
+        start_step:'runbook_step_complete',
+        end_step:  'runbook_step_complete',
+      };
+
+      await writeAudit({
+        action_type: actionMap[data.event_type] || 'time_manual_edit',
+        entity_type: 'activity',
+        entity_id:   record.id || 'unknown',
+        actor_email: actorEmail,
+        job_id:      data.work_order_id,
+        payload: { event_type: data.event_type, timestamp: data.timestamp },
+      });
+
+      return validated.success ? validated.data : record;
+    } catch (err) {
+      console.error('[Activity] logActivity failed:', err);
+      throw err;
+    }
   }
 
   async listActivities(workOrderId) {
-    return base44.entities.Activity.filter({ work_order_id: workOrderId }, '-timestamp', 100);
+    try {
+      const data = await base44.entities.Activity.filter({ work_order_id: workOrderId }, '-timestamp', 100);
+      const validated = validateActivityList(data);
+      if (validated.length < data.length) {
+        console.warn(`[Activity] Filtered ${data.length - validated.length} invalid activity records`);
+      }
+      return validated;
+    } catch (err) {
+      console.error('[Activity] listActivities failed:', err);
+      return [];
+    }
   }
 }
 
