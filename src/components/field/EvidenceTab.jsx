@@ -60,7 +60,7 @@ export default function EvidenceTab({ job }) {
         </div>
       )}
 
-      {/* ── Capture button ─────────────────────────────────── */}
+      {/* ── Evidence section header ──────────────────────── */}
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
           {activeType ? activeType.replace(/_/g, ' ') : 'All Evidence'}
@@ -68,9 +68,9 @@ export default function EvidenceTab({ job }) {
         </p>
         <button
           onClick={() => setShowCapture(v => !v)}
-          className="flex items-center gap-1.5 h-7 px-3 rounded-[8px] bg-slate-900 text-white text-xs font-bold active:opacity-80"
+          className="h-8 px-2.5 rounded-md bg-[#0B2D5C] text-white text-[11px] font-semibold flex items-center gap-1.5 active:opacity-80"
         >
-          <Camera className="h-3 w-3" />
+          <Camera className="h-3.5 w-3.5" />
           {showCapture ? 'Hide' : 'Capture'}
         </button>
       </div>
