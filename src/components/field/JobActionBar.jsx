@@ -170,37 +170,34 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
   return (
     <>
       {/* ── Bar ───────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-[0_-2px_6px_rgba(15,23,36,0.06)]">
-        <div className="max-w-lg mx-auto px-3 py-2.5 flex items-center gap-2">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-sm">
+        <div className="max-w-lg mx-auto px-3 py-1.5 flex items-center gap-1.5">
 
           {/* Timer block */}
           <button
             onClick={handleTimer}
             disabled={isReadOnly || fire.isPending}
             className={cn(
-              'flex items-center gap-2 h-11 px-3 py-2 rounded-[8px] transition-all flex-shrink-0 min-w-[100px] disabled:opacity-50',
+              'flex items-center gap-1.5 h-10 px-2.5 rounded-md transition-all flex-shrink-0 min-w-[110px] disabled:opacity-50',
               timerBg
             )}
             aria-label={timerLabel + ' timer'}
           >
-            <div className="flex flex-col items-start">
-              <span className={cn('h-1.5 w-1.5 rounded-full mb-0.5', state !== 'idle' ? 'bg-white/70' : 'bg-white/30')} />
-              <span className="text-[9px] font-black opacity-80 uppercase tracking-wide">{cfg.label}</span>
+            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', state !== 'idle' ? 'bg-white/70' : 'bg-white/30')} />
+            <div className="flex flex-col items-start leading-none">
+              <span className="text-[8px] font-black opacity-75 uppercase tracking-wide">{cfg.label}</span>
+              <span className="font-mono font-black text-sm tabular-nums">{fmt(elapsed)}</span>
             </div>
-            <span className="font-mono font-black text-sm tabular-nums">{fmt(elapsed)}</span>
-            <div className={cn(
-              'flex items-center justify-center h-7 w-7 rounded-xl ml-auto',
-              state === 'working' ? 'bg-white/20' : 'bg-white/15'
-            )}>
-              {state === 'idle'    ? <Play    className="h-3.5 w-3.5" /> :
-               state === 'working' ? <Pause   className="h-3.5 w-3.5" /> :
-                                     <Play    className="h-3.5 w-3.5" />}
+            <div className="flex items-center justify-center h-6 w-6 rounded bg-white/20 ml-auto flex-shrink-0">
+              {state === 'idle'    ? <Play  className="h-3 w-3" /> :
+               state === 'working' ? <Pause className="h-3 w-3" /> :
+                                     <Play  className="h-3 w-3" />}
             </div>
           </button>
 
-          <div className="w-px h-8 bg-slate-200 flex-shrink-0" />
+          <div className="w-px h-7 bg-slate-200 flex-shrink-0" />
 
-          {/* Action buttons */}
+          {/* Action buttons — 36px, rectangular */}
           {ACTION_BTNS.map(btn => {
             const Icon = btn.Icon;
             return (
@@ -208,13 +205,13 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
                 key={btn.id}
                 onClick={() => setSheet(btn.id)}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-11 rounded-[8px] transition-all active:scale-95 gap-0.5',
+                  'flex flex-col items-center justify-center flex-1 h-10 rounded-md transition-all active:scale-95 gap-0.5',
                   btn.bg
                 )}
                 aria-label={btn.label}
               >
                 <Icon className={cn('h-4 w-4', btn.cls)} />
-                <span className={cn('text-[9px] font-bold', btn.cls)}>{btn.label}</span>
+                <span className={cn('text-[9px] font-semibold', btn.cls)}>{btn.label}</span>
               </button>
             );
           })}
