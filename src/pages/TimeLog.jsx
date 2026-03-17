@@ -31,6 +31,8 @@ import ActiveTimerCard from '../components/time/ActiveTimerCard';
 import TimelineBar from '../components/time/TimelineBar';
 import JobTimeBreakdown from '../components/time/JobTimeBreakdown';
 import ManualEntrySheet from '../components/time/ManualEntrySheet';
+import TimeTypeSelector from '../components/time/TimeTypeSelector';
+import JobSelectorModal from '../components/time/JobSelectorModal';
 import { MOCK_TIME_ENTRIES, MOCK_JOBS_FOR_TIME } from '../lib/mockTimeEntries';
 
 // ── helpers ───────────────────────────────────────────────────────────
@@ -88,11 +90,13 @@ async function flushOfflineQueue(queryClient) {
 export default function TimeLog() {
   const [date,         setDate]         = useState(new Date());
   const [editEntry,    setEditEntry]    = useState(null);   // entry being corrected
-  const [showManual,   setShowManual]   = useState(false);
-  const [locationInfo, setLocationInfo] = useState(null);   // { state, job, distMeters }
-  const [localEntries, setLocalEntries] = useState([]);     // optimistic local entries
-  const [geoAlerts,    setGeoAlerts]    = useState([]);     // active geofence alert types
-  const [gpsAccuracy,  setGpsAccuracy]  = useState(null);
+  const [showManual,    setShowManual]    = useState(false);
+  const [locationInfo,  setLocationInfo]  = useState(null);   // { state, job, distMeters }
+  const [localEntries,  setLocalEntries]  = useState([]);     // optimistic local entries
+  const [geoAlerts,     setGeoAlerts]     = useState([]);     // active geofence alert types
+  const [gpsAccuracy,   setGpsAccuracy]   = useState(null);
+  const [selectedType,  setSelectedType]  = useState(null);   // work|break|travel|off
+  const [showJobPicker, setShowJobPicker] = useState(false);  // multi-job picker
 
   const queryClient = useQueryClient();
 
@@ -190,10 +194,39 @@ export default function TimeLog() {
     }
   };
 
-  const handleTimerAction = (type) => {
+  // Auto-map job based on scheduled date/time
+  const getScheduledJobsForToday = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return allJobs.filter(j => j.scheduled_date === today);
+  };
+
+  const handleTimeTypeSelect = (type) => {
+    const mapToEntryType = {
+      work: activeState === 'working' ? 'work_stop' : 'work_start',
+      break: activeState === 'on_break' ? 'break_end' : 'break_start',
+      travel: activeState === 'traveling' ? 'travel_end' : 'travel_start',
+      off: 'work_stop', // Off = stop work if running
+    };
+
+    // Auto-map to job
+    const scheduledJobs = getScheduledJobsForToday();
+    if (scheduledJobs.length > 1) {
+      // Show picker
+      setSelectedType(type);
+      setShowJobPicker(true);
+    } else if (scheduledJobs.length === 1) {
+      // Auto-select the only job
+      submitTimeEntry(mapToEntryType[type], scheduledJobs[0].id);
+    } else {
+      // No scheduled job, use active or first job
+      submitTimeEntry(mapToEntryType[type], activeJobId || allJobs[0]?.id || '');
+    }
+  };
+
+  const submitTimeEntry = (entryType, jobId) => {
     const entry = {
-      entry_type: type,
-      job_id: activeJobId || allJobs[0]?.id || '',
+      entry_type: entryType,
+      job_id: jobId,
       timestamp: new Date().toISOString(),
       source: 'app',
       sync_status: 'pending',
@@ -207,7 +240,18 @@ export default function TimeLog() {
       work_start: 'Work started', work_stop: 'Work stopped',
       break_start: 'Break started', break_end: 'Break ended',
       travel_start: 'Travel started', travel_end: 'Arrived on site',
-    }[type] || 'Logged');
+    }[entryType] || 'Logged');
+    setSelectedType(null);
+    setShowJobPicker(false);
+  };
+
+  const handleTimerAction = (type) => {
+    const mapToEntryType = {
+      work_start: 'work_start', work_stop: 'work_stop',
+      break_start: 'break_start', break_end: 'break_end',
+      travel_start: 'travel_start', travel_end: 'travel_end',
+    };
+    submitTimeEntry(mapToEntryType[type], activeJobId || allJobs[0]?.id || '');
   };
 
   const handleSaveEntry = (data) => {
@@ -334,6 +378,17 @@ export default function TimeLog() {
           </button>
         </div>
 
+        {/* ── Time Type Quick Selector (today only) ── */}
+        {isToday(date) && (
+          <div className="bg-white rounded-2xl border border-slate-100 p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Time Entry</p>
+            <TimeTypeSelector
+              onSelect={handleTimeTypeSelect}
+              disabled={false}
+            />
+          </div>
+        )}
+
         {/* ── Active timer (today only) ─────────────── */}
         {isToday(date) && (
           <ActiveTimerCard
@@ -445,6 +500,23 @@ export default function TimeLog() {
           date={date}
           onSave={handleSaveEntry}
           onClose={() => { setShowManual(false); setEditEntry(null); }}
+        />
+      )}
+
+      {/* ── Job Selector Modal ────────────────────── */}
+      {showJobPicker && selectedType && (
+        <JobSelectorModal
+          jobs={getScheduledJobsForToday()}
+          onSelect={(jobId) => {
+            const mapToEntryType = {
+              work: activeState === 'working' ? 'work_stop' : 'work_start',
+              break: activeState === 'on_break' ? 'break_end' : 'break_start',
+              travel: activeState === 'traveling' ? 'travel_end' : 'travel_start',
+              off: 'work_stop',
+            };
+            submitTimeEntry(mapToEntryType[selectedType], jobId);
+          }}
+          onCancel={() => { setShowJobPicker(false); setSelectedType(null); }}
         />
       )}
     </div>
