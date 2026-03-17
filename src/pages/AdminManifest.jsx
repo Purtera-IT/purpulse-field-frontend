@@ -113,8 +113,12 @@ export default function AdminManifest() {
     queryKey: ['admin-snapshots'],
     queryFn: () => base44.entities.DatasetSnapshot.list('-created_date', 20),
   });
+  const { data: evidence = [], isLoading: loadEv } = useQuery({
+    queryKey: ['admin-evidence-all'],
+    queryFn: () => base44.entities.Evidence.list('-created_date', 500),
+  });
 
-  const isLoading = loadM || loadA || loadL || loadMt || loadS;
+  const isLoading = loadM || loadA || loadL || loadMt || loadS || loadEv;
 
   // ── Metrics ───────────────────────────────────────────────────────
   const totalEvidence      = manifests.length;
