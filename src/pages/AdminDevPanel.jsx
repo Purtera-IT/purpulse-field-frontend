@@ -44,6 +44,7 @@ export default function AdminDevPanel() {
       return 'success';
     }
   });
+  const [tokenExpired, setTokenExpired] = useState(false);
 
   const { data: manifests  = [], isLoading: lM } = useQuery({ queryKey: ['adp-manifests'],  queryFn: () => base44.entities.UploadManifest.list('-created_date', 500) });
   const { data: auditLogs  = [], isLoading: lA } = useQuery({ queryKey: ['adp-audit'],       queryFn: () => base44.entities.AuditLog.list('-created_date', 500) });
