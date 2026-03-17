@@ -15,9 +15,10 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Download, RefreshCw, Database, Image, Tag, Mic, CheckCircle2,
-  AlertCircle, BarChart3, Layers, Calendar, Users, Loader2,
-  ChevronDown, ChevronRight, Zap, PackagePlus,
+  AlertCircle, BarChart3, Layers, Calendar, Loader2,
+  Zap, PackagePlus, Clock,
 } from 'lucide-react';
+import JobTimeline from '../components/admin/JobTimeline';
 import { cn } from '@/lib/utils';
 import { rowsToCSV, downloadCSV } from '@/lib/mockManifest';
 import { seedMockData } from '@/lib/mockSeedData';
