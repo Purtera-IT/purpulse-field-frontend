@@ -135,22 +135,27 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
               <StatusIcon className={cn('h-3.5 w-3.5 flex-shrink-0', statusCfg.cls)} />
             </div>
 
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
-                <Clock className="h-2 w-2" /> {task.duration_est}
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+              <span className="flex items-center gap-0.5 text-[9px] text-slate-400 font-semibold">
+                <Clock className="h-1.5 w-1.5" /> {task.duration_est}
               </span>
               {task.gate === 'blocking' && status !== 'done' && (
-                <span className="text-[9px] font-black text-red-600 bg-red-50 px-1 py-px rounded border border-red-200">GATE</span>
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-black text-white bg-red-600 px-1.5 py-0.5 rounded-full">
+                  <AlertCircle className="h-2 w-2" /> GATE
+                </span>
               )}
               {qcFailCount > 0 && (
-                <span className="text-[9px] font-black text-red-600 bg-red-50 px-1 rounded border border-red-200">{qcFailCount} QC✗</span>
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-black text-white bg-red-600 px-1.5 py-0.5 rounded-full">{qcFailCount}✗</span>
               )}
               {qcWarnCount > 0 && (
-                <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded border border-amber-200">{qcWarnCount} QC!</span>
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-black text-white bg-amber-500 px-1.5 py-0.5 rounded-full">{qcWarnCount}!</span>
               )}
               {status !== 'done' && requiredIds.length > 0 && (
-                <span className={cn('text-[9px]', blockedByDelivs ? 'text-red-500 font-black' : 'text-slate-400')}>
-                  {capturedCount}/{requiredIds.length} ev
+                <span className={cn(
+                  'inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.5 rounded-full',
+                  blockedByDelivs ? 'text-white bg-red-600' : 'text-slate-600 bg-slate-200'
+                )}>
+                  <Camera className="h-2 w-2" /> {capturedCount}/{requiredIds.length}
                 </span>
               )}
             </div>
