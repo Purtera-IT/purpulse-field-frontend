@@ -101,6 +101,12 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       setUser(currentUser);
+      
+      // Build permissions from user role
+      const userRole = currentUser?.role || 'viewer';
+      const userPermissions = buildPermissions(userRole);
+      setPermissions(userPermissions);
+      
       cacheUserForOffline(currentUser); // Cache for offline access
       setIsAuthenticated(true);
       setAuthError(null);
