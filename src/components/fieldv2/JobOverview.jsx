@@ -6,9 +6,11 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import {
   MapPin, Phone, Mail, User, Clock, Building2,
   Play, CheckCircle, Camera, AlertTriangle, FileText,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
