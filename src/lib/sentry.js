@@ -31,8 +31,8 @@ const ENV = process.env.NODE_ENV || 'development';
  * Call this once at app startup (main.jsx or App.jsx)
  */
 export function initSentry() {
-  if (!SENTRY_DSN || ENV === 'test') {
-    console.info('[Telemetry] Sentry disabled (no DSN or test env)');
+  if (!Sentry || !SENTRY_DSN || ENV === 'test') {
+    console.info('[Telemetry] Sentry disabled (not installed, no DSN, or test env)');
     return;
   }
 
