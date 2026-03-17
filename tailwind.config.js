@@ -1,7 +1,24 @@
 /** @type {import('tailwindcss').Config} */
 
-// ── Enterprise design tokens ─────────────────────────────────────────
-const ent = require('./design-tokens/design-tokens.enterprise.json');
+// ── Enterprise design tokens (inlined from design-tokens.enterprise.json) ─
+const ent = {
+  grid: 8,
+  space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 },
+  type: {
+    h1: { size: 20, weight: 600 }, h2: { size: 16, weight: 600 },
+    h3: { size: 14, weight: 600 }, body: { size: 14, weight: 400 },
+    caption: { size: 11, weight: 400 },
+  },
+  color: {
+    brand: '#0B2D5C', accent: '#0B66B2', success: '#0E8A5F',
+    warn: '#B76A00', danger: '#B33A3A',
+    'neutral-900': '#0F1724', 'neutral-700': '#334155',
+    'neutral-500': '#6B7280', 'neutral-200': '#E6EEF3', 'neutral-50': '#F8FAFC',
+  },
+  radius: { sm: 4, md: 8, lg: 12 },
+  shadow: { sm: '0 2px 6px rgba(15,23,36,0.06)' },
+  touch: 44,
+};
 
 module.exports = {
     darkMode: ["class"],
