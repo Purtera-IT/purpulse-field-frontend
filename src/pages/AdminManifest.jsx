@@ -121,22 +121,43 @@ export default function AdminManifest() {
   const isLoading = loadM || loadA || loadL || loadMt || loadS || loadEv;
 
   // ── Metrics ───────────────────────────────────────────────────────
-  const totalEvidence      = manifests.length;
-  const geoEvidence        = manifests.filter(m => m.geo_lat != null).length;
-  const approvedTraining   = manifests.filter(m => m.approved_for_training).length;
-  const withEmbedding      = labels.filter(l => l.embedding != null).length;
-  const transcriptCount    = meetings.filter(m => m.transcript_url).length;
-  const avgImgPerJob       = (() => {
+  const totalEvidence      = evidence.length;
+  const manifestRowsTotal  = manifests.length;
+
+  // evidence_count_by_status from Evidence.qc_status (approved=passed, rejected=failed)
+  const evByQcStatus = {
+    qc_passed:  evidence.filter(e => e.qc_status === 'approved').length,
+    qc_failed:  evidence.filter(e => e.qc_status === 'rejected').length,
+    unknown:    evidence.filter(e => !e.qc_status || e.qc_status === 'pending').length,
+  };
+
+  // images_with_geo from Evidence
+  const geoEvidence       = evidence.filter(e => e.geo_lat != null).length;
+  const imagesWithGeoPct  = totalEvidence ? +((geoEvidence / totalEvidence) * 100).toFixed(1) : 0;
+
+  // approved_for_training from Evidence
+  const approvedTraining  = evidence.filter(e => e.approved_for_training).length;
+
+  // manifest_migrated = manifests with azure_blob_url set
+  const manifestMigrated  = manifests.filter(m => m.azure_blob_url && !m.azure_blob_url.startsWith('http://mock')).length;
+
+  // labeled_count, avg_labels_per_evidence
+  const labeledCount      = labels.length;
+  const avgLabelsPerEv    = totalEvidence ? (labeledCount / totalEvidence).toFixed(2) : '0.00';
+
+  // avg_images_per_job from manifests
+  const avgImgPerJob = (() => {
     if (!manifests.length) return 0;
     const byJob = {};
     manifests.forEach(m => { byJob[m.job_id] = (byJob[m.job_id] || 0) + 1; });
     const vals = Object.values(byJob);
     return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : 0;
   })();
-  const labelCoverage = totalEvidence
-    ? ((labels.length / totalEvidence) * 100).toFixed(0)
-    : 0;
-  const trainingReady = approvedTraining >= 500;
+
+  const transcriptCount = meetings.filter(m => m.transcript_url).length;
+  const withEmbedding   = labels.filter(l => l.embedding?.length > 0).length;
+  const labelCoverage   = totalEvidence ? ((labeledCount / totalEvidence) * 100).toFixed(0) : 0;
+  const trainingReady   = approvedTraining >= 500;
 
   // ── Seed mutation ─────────────────────────────────────────────────
   const seedMutation = useMutation({
