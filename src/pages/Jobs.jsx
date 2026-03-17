@@ -220,6 +220,62 @@ export default function Jobs() {
         activeFilterCount={activeFilterCount}
       />
 
+      {/* ── Advanced filters panel (expandable below header) ── */}
+      {showAdvanced && (
+        <div className="max-w-2xl mx-auto w-full px-4 py-3 bg-white border-b border-slate-100">
+          <div className="grid grid-cols-3 gap-3">
+            {/* Priority */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Priority</p>
+              <select
+                value={priorityFilter}
+                onChange={e => setPriorityFilter(e.target.value)}
+                className="w-full h-9 rounded-[6px] border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] text-slate-700"
+              >
+                {PRIORITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Date</p>
+              <select
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value)}
+                className="w-full h-9 rounded-[6px] border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] text-slate-700"
+              >
+                {DATE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {/* Technician */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Technician</p>
+              <select
+                value={techFilter}
+                onChange={e => setTechFilter(e.target.value)}
+                className="w-full h-9 rounded-[6px] border border-slate-200 bg-white text-xs font-semibold px-2 focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] text-slate-700"
+              >
+                <option value="all">All Techs</option>
+                {techs.map(([email, name]) => (
+                  <option key={email} value={email}>{name || email}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Reset link */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => { setPriorityFilter('all'); setDateFilter('all'); setTechFilter('all'); }}
+              className="w-full mt-3 text-xs text-red-600 font-semibold flex items-center gap-1 justify-center py-2 hover:bg-red-50 rounded-[6px] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0B2D5C]"
+            >
+              <X className="h-3 w-3" /> Clear advanced filters
+            </button>
+          )}
+        </div>
+      )}
+
       {!isOnline && <OfflineBanner pendingCount={pendingCount} />}
 
       {isRefreshing && (
