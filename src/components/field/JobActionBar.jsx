@@ -230,22 +230,22 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
                 <Square className="h-6 w-6 text-red-600" />
               </div>
               <h2 className="text-lg font-black text-slate-900">End work session?</h2>
-              <p className="text-slate-500 text-sm mt-1 font-mono font-bold">{fmt(elapsed)} recorded</p>
+              <p className="text-slate-500 text-sm mt-1 font-mono font-bold">{fmt(elapsed)} elapsed</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => { handleBreak(); setStopConfirm(false); }}
                 className="flex-1 h-11 py-3 rounded-[8px] bg-amber-50 text-amber-700 font-bold text-sm flex items-center justify-center gap-2 border border-amber-200">
-                <Pause className="h-4 w-4" /> Take Break
+                <Pause className="h-4 w-4" /> Break
               </button>
               <button
                 onClick={() => { haptic('stop'); fire.mutate('work_stop'); toast.success('Work session ended'); setStopConfirm(false); }}
                 className="flex-1 h-11 py-3 rounded-[8px] bg-red-600 text-white font-bold text-sm flex items-center justify-center gap-2">
-                <Square className="h-4 w-4" /> End Session
+                <Square className="h-4 w-4" /> End
               </button>
             </div>
             <button onClick={() => setStopConfirm(false)}
               className="w-full mt-2 h-11 rounded-[8px] border-2 border-slate-200 text-slate-600 font-semibold text-sm">
-              Keep Working
+              Continue
             </button>
           </div>
         </div>
