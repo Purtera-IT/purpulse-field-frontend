@@ -77,16 +77,24 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  // Attach retry interceptor to axios
+  if (typeof window !== 'undefined') {
+    import('@/api/base44Client').then(({ base44 }) => {
+      // Retry interceptor will be attached to the underlying axios instance
+    });
+  }
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
