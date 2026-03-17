@@ -82,6 +82,7 @@ export const PAGES = {
     "AdminUsers": AdminUsers,
     "AdminDevices": AdminDevices,
     "DevModelInputs": DevModelInputs,
+    "AdminManifest": AdminManifest,
     "Chat": Chat,
     "Profile": Profile,
 }

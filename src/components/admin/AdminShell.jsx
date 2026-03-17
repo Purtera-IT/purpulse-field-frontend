@@ -7,17 +7,18 @@ import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
   Briefcase, ShieldCheck, Database, ScrollText,
-  Users, Smartphone, BarChart3, ChevronLeft, Menu, X
+  Users, Smartphone, BarChart3, ChevronLeft, Menu, FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV = [
-  { page: 'AdminJobs',     icon: Briefcase,   label: 'Jobs',          group: 'Operations' },
-  { page: 'AdminQC',       icon: ShieldCheck,  label: 'QC Review',     group: 'Operations' },
-  { page: 'AdminSnapshot', icon: Database,     label: 'Snapshots',     group: 'Data' },
-  { page: 'AdminAuditLog', icon: ScrollText,   label: 'Audit Log',     group: 'Data' },
-  { page: 'AdminUsers',    icon: Users,        label: 'Users & Roles', group: 'Admin' },
-  { page: 'AdminDevices',  icon: Smartphone,   label: 'Devices',       group: 'Admin' },
+  { page: 'AdminJobs',      icon: Briefcase,       label: 'Jobs',          group: 'Operations' },
+  { page: 'AdminQC',        icon: ShieldCheck,     label: 'QC Review',     group: 'Operations' },
+  { page: 'AdminSnapshot',  icon: Database,        label: 'Snapshots',     group: 'Data' },
+  { page: 'AdminAuditLog',  icon: ScrollText,      label: 'Audit Log',     group: 'Data' },
+  { page: 'AdminManifest',  icon: FileSpreadsheet, label: 'Manifest & ML', group: 'Data' },
+  { page: 'AdminUsers',     icon: Users,           label: 'Users & Roles', group: 'Admin' },
+  { page: 'AdminDevices',   icon: Smartphone,      label: 'Devices',       group: 'Admin' },
 ];
 
 const GROUPS = ['Operations', 'Data', 'Admin'];
@@ -28,7 +29,7 @@ export default function AdminShell({ children, title, subtitle }) {
   const current = location.pathname.replace('/', '');
 
   const sidebar = (
-    <nav className={cn('flex flex-col h-full bg-slate-900 text-white', open ? 'w-56' : 'w-56')}>
+    <nav className="flex flex-col h-full bg-slate-900 text-white w-56">
       <div className="flex items-center gap-2.5 px-4 py-5 border-b border-slate-800">
         <div className="h-8 w-8 rounded-lg bg-slate-700 flex items-center justify-center flex-shrink-0">
           <BarChart3 className="h-4 w-4 text-slate-200" />
