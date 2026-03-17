@@ -27,14 +27,21 @@ function SortIcon({ col, sort }) {
 }
 
 function Th({ col, label, sort, onSort, className }) {
+  const isSorted = col && sort.col === col;
+  const ariaSort = !col ? undefined : isSorted ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
   return (
     <th
+      scope="col"
+      role="columnheader"
+      aria-sort={ariaSort}
       className={cn(
-        'px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap border-b border-slate-100 bg-slate-50 select-none',
-        col && 'cursor-pointer hover:text-slate-700',
+        'px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap border-b border-slate-100 bg-slate-50 select-none',
+        col && 'cursor-pointer hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-[#0B2D5C] focus-visible:outline-offset-[-2px]',
         className
       )}
+      tabIndex={col ? 0 : undefined}
       onClick={col ? () => onSort(col) : undefined}
+      onKeyDown={col ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(col); } } : undefined}
     >
       <span className="flex items-center gap-1">
         {label}
@@ -140,11 +147,16 @@ export default function JobsTable({ jobs, total, page, pageSize, sort, onSort, o
                 return (
                   <tr
                     key={job.id}
+                    role="row"
+                    aria-rowindex={page * pageSize + i + 2}
+                    aria-selected={isSelected}
+                    tabIndex={0}
                     className={cn(
-                      'border-b border-slate-50 last:border-0 transition-colors',
+                      'border-b border-slate-50 last:border-0 transition-colors focus-visible:outline-2 focus-visible:outline-[#0B2D5C] focus-visible:outline-offset-[-2px] focus-visible:rounded',
                       isSelected ? 'bg-blue-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
                       'hover:bg-slate-50'
                     )}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRow(job.id); } }}
                   >
                     {/* Checkbox */}
                     <td className="px-3 py-2">
@@ -156,12 +168,16 @@ export default function JobsTable({ jobs, total, page, pageSize, sort, onSort, o
                     </td>
 
                     {/* Status */}
-                    <td className="px-3 py-2">
-                      <span className={cn(
-                        'inline-flex items-center gap-1 px-1.5 py-px rounded border font-semibold uppercase tracking-wide text-[10px]',
-                        statusCfg.badgeClass
-                      )}>
-                        <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', statusCfg.dotClass)} />
+                    <td className="px-3 py-2" role="gridcell">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 px-1.5 py-px rounded border font-semibold uppercase tracking-wide text-[10px]',
+                          statusCfg.badgeClass
+                        )}
+                        role="status"
+                        aria-label={`Status: ${statusCfg.label}`}
+                      >
+                        <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', statusCfg.dotClass)} aria-hidden="true" />
                         {statusCfg.label}
                       </span>
                     </td>
@@ -192,9 +208,12 @@ export default function JobsTable({ jobs, total, page, pageSize, sort, onSort, o
                     </td>
 
                     {/* Priority */}
-                    <td className="px-3 py-2">
-                      <span className={cn('text-[10px] font-black uppercase tracking-wide', prioCfg.badgeClass, 'px-1.5 py-px rounded border inline-flex items-center gap-1')}>
-                        <span className={cn('h-1.5 w-1.5 rounded-full', prioCfg.dotClass)} />
+                    <td className="px-3 py-2" role="gridcell">
+                      <span
+                        className={cn('text-[10px] font-black uppercase tracking-wide', prioCfg.badgeClass, 'px-1.5 py-px rounded border inline-flex items-center gap-1')}
+                        aria-label={`Priority: ${prioCfg.label}`}
+                      >
+                        <span className={cn('h-1.5 w-1.5 rounded-full', prioCfg.dotClass)} aria-hidden="true" />
                         {prioCfg.label}
                       </span>
                     </td>
