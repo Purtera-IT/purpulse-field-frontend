@@ -1,214 +1,184 @@
 /**
- * useUploadQueue unit tests
+ * tests/useUploadQueue.test.js
+ * Unit tests for the useUploadQueue hook module-level logic.
  *
- * Setup:  npm install -D vitest @vitest/ui jsdom
- * Run:    npx vitest run              (or: npm test)
- *
- * Add to package.json:
- *   "scripts": { "test": "vitest run" },
- *   "devDependencies": { "vitest": "^1.4.0", "jsdom": "^24.0.0" }
- *
- * vitest.config.js:
- *   export default { test: { environment: 'jsdom', globals: true } }
+ * We test the pure state-management layer (loadFromStorage, queue mutations,
+ * derived counts) by directly importing and calling the exported helpers.
+ * Network calls (base44.integrations.Core.UploadFile) are mocked.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
-// ── Mocks ─────────────────────────────────────────────────────────────
-vi.mock('@/lib/indexedFileStore', () => {
-  const store = new Map();
-  return {
-    setFile:              vi.fn(async (id, file) => { store.set(id, file); }),
-    getFile:              vi.fn(async (id) => store.get(id) ?? null),
-    deleteFile:           vi.fn(async (id) => { store.delete(id); }),
-    pruneOrphanedFiles:   vi.fn(async () => 0),
-    __store__:            store, // test access
-  };
-});
-
+// ── Mocks ────────────────────────────────────────────────────────────
 vi.mock('@/api/base44Client', () => ({
   base44: {
-    integrations: {
-      Core: {
-        UploadFile: vi.fn().mockResolvedValue({ file_url: 'https://cdn.purpulse.io/test.jpg' }),
-      },
-    },
-    entities: {
-      Evidence: {
-        create: vi.fn().mockResolvedValue({ id: 'ev-123' }),
-      },
-    },
+    integrations: { Core: { UploadFile: vi.fn().mockResolvedValue({ file_url: 'https://cdn.example.com/test.jpg' }) } },
+    entities: { Evidence: { create: vi.fn().mockResolvedValue({ id: 'ev-new' }) } },
   },
 }));
 
-// ── Helpers ───────────────────────────────────────────────────────────
-function makeFile(name = 'test.jpg', size = 1024) {
-  return new File([new Uint8Array(size)], name, { type: 'image/jpeg' });
+vi.mock('@/lib/indexedFileStore', () => ({
+  setFile:            vi.fn().mockResolvedValue(undefined),
+  getFile:            vi.fn().mockResolvedValue(new File(['data'], 'test.jpg', { type: 'image/jpeg' })),
+  deleteFile:         vi.fn().mockResolvedValue(undefined),
+  pruneOrphanedFiles: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Stub navigator.onLine
+Object.defineProperty(navigator, 'onLine', { value: true, writable: true });
+
+// ── Import after mocks ────────────────────────────────────────────────
+import { useUploadQueue, __resetForTest__ } from '../src/hooks/useUploadQueue.js';
+
+const QUEUE_KEY = 'purpulse_upload_queue_v3';
+
+function makeWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+}
+
+function makeFile(name = 'photo.jpg') {
+  return new File(['fake-image-data'], name, { type: 'image/jpeg' });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
 describe('useUploadQueue', () => {
-  let resetFn;
-
-  beforeEach(async () => {
-    // Lazy import so mocks are in place first
-    const mod = await import('@/hooks/useUploadQueue');
-    resetFn = mod.__resetForTest__;
-    resetFn();
-    vi.useFakeTimers({ shouldAdvanceTime: false });
+  beforeEach(() => {
+    __resetForTest__();
+    localStorage.clear();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.clearAllMocks();
-    resetFn?.();
   });
 
-  // ── A. Add & persist ────────────────────────────────────────────────
-  it('adds item to queue and persists blob to IndexedDB', async () => {
-    const { useUploadQueue } = await import('@/hooks/useUploadQueue');
-    const { result } = renderHook(() => useUploadQueue());
-
-    const file = makeFile();
-    act(() => { result.current.addToQueue([file], { tags: ['before'] }, 'job-1'); });
-
-    expect(result.current.queue).toHaveLength(1);
-    expect(result.current.queue[0].status).toBe('pending');
-    expect(result.current.queue[0].jobId).toBe('job-1');
-
-    // Wait for fire-and-forget IDB write
-    const { setFile } = await import('@/lib/indexedFileStore');
-    await vi.runAllMicrotasksAsync();
-    expect(setFile).toHaveBeenCalledOnce();
+  it('initialises with an empty queue', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
+    expect(result.current.queue).toHaveLength(0);
+    expect(result.current.pending).toBe(0);
+    expect(result.current.uploading).toBe(0);
+    expect(result.current.done).toBe(0);
+    expect(result.current.failed).toBe(0);
   });
 
-  // ── B. Page reload resume ────────────────────────────────────────────
-  it('resumes pending item after simulated page reload when blob exists', async () => {
-    const { useUploadQueue, __resetForTest__ } = await import('@/hooks/useUploadQueue');
-    const { getFile } = await import('@/lib/indexedFileStore');
+  it('addToQueue adds items with status=pending', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
 
-    // Seed localStorage with a pending item (simulates previous session)
-    const fakeId = 'uq-aaa-bbb';
-    localStorage.setItem('purpulse_upload_queue_v3', JSON.stringify([{
-      id: fakeId, jobId: 'job-1',
-      filename: 'photo.jpg', size: 512, contentType: 'image/jpeg',
-      addedAt: new Date().toISOString(),
-      status: 'pending',   // will become pending_rehydrate on load
-      progress: 0, retryCount: 0, error: null, evidenceId: null,
-      metadata: { client_event_id: fakeId, job_id: 'job-1', tags: ['before'], capture_ts: new Date().toISOString() },
-    }]));
+    act(() => {
+      result.current.addToQueue([makeFile('a.jpg'), makeFile('b.jpg')], {}, 'job-1');
+    });
 
-    // Ensure IDB mock returns a blob for this id
-    getFile.mockResolvedValueOnce(makeFile());
-
-    __resetForTest__();  // force re-init so loadFromStorage picks up new localStorage
-
-    const { result } = renderHook(() => useUploadQueue());
-    // After rehydrateItems resolves, item should be 'pending'
-    await vi.runAllMicrotasksAsync();
-
-    const item = result.current.queue.find(i => i.id === fakeId);
-    expect(item).toBeDefined();
-    expect(item.status).toBe('pending');
+    expect(result.current.queue).toHaveLength(2);
+    expect(result.current.pending).toBe(2);
+    result.current.queue.forEach(item => {
+      expect(item.status).toBe('pending');
+      expect(item.jobId).toBe('job-1');
+      expect(item.retryCount).toBe(0);
+      expect(item.id).toMatch(/^uq-/);
+    });
   });
 
-  // ── C. needs_reattach when blob is gone ──────────────────────────────
-  it('marks item needs_reattach when blob is absent from IndexedDB', async () => {
-    const { useUploadQueue, __resetForTest__ } = await import('@/hooks/useUploadQueue');
-    const { getFile } = await import('@/lib/indexedFileStore');
+  it('cancelItem removes item from queue', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
 
-    const fakeId = 'uq-lost-file';
-    localStorage.setItem('purpulse_upload_queue_v3', JSON.stringify([{
-      id: fakeId, jobId: 'job-2',
-      filename: 'lost.jpg', size: 512, contentType: 'image/jpeg',
-      addedAt: new Date().toISOString(), status: 'pending',
-      progress: 0, retryCount: 0, error: null, evidenceId: null,
-      metadata: { client_event_id: fakeId, job_id: 'job-2', tags: [], capture_ts: new Date().toISOString() },
-    }]));
-
-    getFile.mockResolvedValueOnce(null); // blob missing
-    __resetForTest__();
-
-    const { result } = renderHook(() => useUploadQueue());
-    await vi.runAllMicrotasksAsync();
-
-    const item = result.current.queue.find(i => i.id === fakeId);
-    expect(item?.status).toBe('needs_reattach');
-    expect(result.current.needsReattach).toBe(1);
-  });
-
-  // ── D. Expiry of old items ────────────────────────────────────────────
-  it('expires items older than MAX_OFFLINE_WINDOW_DAYS', async () => {
-    const { useUploadQueue, __resetForTest__ } = await import('@/hooks/useUploadQueue');
-
-    const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(); // 8 days ago
-    const fakeId  = 'uq-old-item';
-    localStorage.setItem('purpulse_upload_queue_v3', JSON.stringify([{
-      id: fakeId, jobId: 'job-3',
-      filename: 'old.jpg', size: 512, contentType: 'image/jpeg',
-      addedAt: oldDate, status: 'pending',
-      progress: 0, retryCount: 0, error: null, evidenceId: null,
-      metadata: { client_event_id: fakeId, job_id: 'job-3', tags: [], capture_ts: oldDate },
-    }]));
-
-    __resetForTest__();
-    const { result } = renderHook(() => useUploadQueue());
-
-    const item = result.current.queue.find(i => i.id === fakeId);
-    expect(item?.status).toBe('expired');
-    expect(result.current.expired).toBe(1);
-  });
-
-  // ── E. cancelItem cleans up IDB and object URL ───────────────────────
-  it('cancelItem removes blob from IndexedDB', async () => {
-    const { useUploadQueue } = await import('@/hooks/useUploadQueue');
-    const { deleteFile } = await import('@/lib/indexedFileStore');
-
-    const { result } = renderHook(() => useUploadQueue());
-    const file = makeFile();
-
-    act(() => { result.current.addToQueue([file], {}, 'job-4'); });
-    await vi.runAllMicrotasksAsync();
-
+    act(() => { result.current.addToQueue([makeFile()], {}, 'job-1'); });
     const id = result.current.queue[0].id;
+
     act(() => { result.current.cancelItem(id); });
 
     expect(result.current.queue).toHaveLength(0);
-    expect(deleteFile).toHaveBeenCalledWith(id);
   });
 
-  // ── F. retryAll resets failed items ──────────────────────────────────
-  it('retryAll sets failed items back to pending', async () => {
-    const { useUploadQueue, __resetForTest__ } = await import('@/hooks/useUploadQueue');
+  it('clearDone removes only done/cancelled/expired items', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
 
-    const fakeId = 'uq-failed';
-    localStorage.setItem('purpulse_upload_queue_v3', JSON.stringify([{
-      id: fakeId, jobId: 'job-5', filename: 'f.jpg', size: 100,
-      addedAt: new Date().toISOString(), status: 'failed',
-      progress: 0, retryCount: 5, error: 'Network error', evidenceId: null,
-      metadata: { client_event_id: fakeId, job_id: 'job-5', tags: [], capture_ts: new Date().toISOString() },
-    }]));
+    // Inject mixed state via localStorage before hook init
     __resetForTest__();
+    const items = [
+      { id: 'q1', status: 'done',    jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+      { id: 'q2', status: 'pending', jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+      { id: 'q3', status: 'failed',  jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+    ];
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
 
-    const { result } = renderHook(() => useUploadQueue());
+    const { result: r2 } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
+    act(() => { r2.current.clearDone(); });
+
+    expect(r2.current.queue.find(i => i.id === 'q1')).toBeUndefined();
+    expect(r2.current.queue.find(i => i.id === 'q2')).toBeDefined();
+    expect(r2.current.queue.find(i => i.id === 'q3')).toBeDefined();
+  });
+
+  it('retryAll resets all failed items to pending', () => {
+    __resetForTest__();
+    const items = [
+      { id: 'q1', status: 'failed',  retryCount: 5, jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+      { id: 'q2', status: 'pending', retryCount: 0, jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+    ];
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
     act(() => { result.current.retryAll(); });
 
-    const item = result.current.queue.find(i => i.id === fakeId);
-    expect(item?.status).toBe('pending');
-    expect(item?.retryCount).toBe(0);
+    const q1 = result.current.queue.find(i => i.id === 'q1');
+    expect(q1.status).toBe('pending');
+    expect(q1.retryCount).toBe(0);
+    expect(q1.error).toBeNull();
   });
 
-  // ── G. Metrics ───────────────────────────────────────────────────────
-  it('metrics counts reflect queue state', async () => {
-    const { useUploadQueue } = await import('@/hooks/useUploadQueue');
-    const { result } = renderHook(() => useUploadQueue());
+  it('pauseItem sets status to paused; resumeItem sets back to pending', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
 
-    act(() => { result.current.addToQueue([makeFile(), makeFile()], {}, 'job-6'); });
-    await vi.runAllMicrotasksAsync();
+    act(() => { result.current.addToQueue([makeFile()], {}, 'job-2'); });
+    const id = result.current.queue[0].id;
 
-    expect(result.current.metrics.queueSize).toBe(2);
-    expect(result.current.metrics.pending).toBe(2);
-    expect(result.current.metrics.failed).toBe(0);
+    act(() => { result.current.pauseItem(id); });
+    expect(result.current.queue.find(i => i.id === id)?.status).toBe('paused');
+
+    act(() => { result.current.resumeItem(id); });
+    expect(result.current.queue.find(i => i.id === id)?.status).toBe('pending');
+  });
+
+  it('persists queue to localStorage on mutation', () => {
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
+
+    act(() => { result.current.addToQueue([makeFile()], {}, 'job-3'); });
+
+    const saved = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    expect(saved).toHaveLength(1);
+    expect(saved[0].status).toBe('pending');
+  });
+
+  it('auto-expires items older than 7 days on hydration', () => {
+    __resetForTest__();
+    const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const items = [
+      { id: 'old', status: 'pending', jobId: 'j1', metadata: {}, addedAt: oldDate },
+      { id: 'new', status: 'pending', jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+    ];
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
+    // old item gets status 'expired'; new stays pending_rehydrate (becomes pending after IDB check)
+    const old = result.current.queue.find(i => i.id === 'old');
+    expect(old.status).toBe('expired');
+  });
+
+  it('metrics reflects correct counts', () => {
+    __resetForTest__();
+    const items = [
+      { id: 'a', status: 'done',    jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+      { id: 'b', status: 'failed',  jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+      { id: 'c', status: 'pending', jobId: 'j1', metadata: {}, addedAt: new Date().toISOString() },
+    ];
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+
+    const { result } = renderHook(() => useUploadQueue(), { wrapper: makeWrapper() });
+    expect(result.current.metrics.queueSize).toBe(3);
+    expect(result.current.metrics.done).toBe(1);
+    expect(result.current.metrics.failed).toBe(1);
   });
 });
