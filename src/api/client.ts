@@ -127,13 +127,19 @@ export class APIClient {
   private retryConfig: RetryConfig
 
   constructor(retryConfig: Partial<RetryConfig> = {}) {
-    this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig }
-    this.axios = axios.create({
-      baseURL: process.env.REACT_APP_API_BASE_URL || 'https://api.purpulse.local',
-      timeout: 30000,
-    })
+   this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig }
 
-    this.setupInterceptors()
+   // Use mock API in development, real API in production
+   const baseURL = process.env.NODE_ENV === 'development'
+     ? '/api'
+     : process.env.REACT_APP_API_BASE_URL || 'https://api.purpulse.local'
+
+   this.axios = axios.create({
+     baseURL,
+     timeout: 30000,
+   })
+
+   this.setupInterceptors()
   }
 
   /**
@@ -167,6 +173,18 @@ export class APIClient {
    * GET /jobs — List all jobs with retry
    */
   async getJobs(config?: RequestConfig): Promise<Job[]> {
+    if (process.env.NODE_ENV === 'development') {
+      return withRetry(
+        async () => {
+          const response = await this.axios.get<Job[]>('/jobs')
+          return response.data.map((job) => validateResponse(job, JobSchema, 'GET /jobs'))
+        },
+        'GET /jobs',
+        'GET',
+        this.retryConfig
+      )
+    }
+
     return withRetry(
       async () => {
         const jobs = await base44.entities.Job.list('-scheduled_date', 100)
@@ -182,6 +200,18 @@ export class APIClient {
    * GET /jobs/:id — Get single job
    */
   async getJob(jobId: string, config?: RequestConfig): Promise<Job | null> {
+    if (process.env.NODE_ENV === 'development') {
+      return withRetry(
+        async () => {
+          const response = await this.axios.get<Job>(`/jobs/${jobId}`)
+          return validateResponse(response.data, JobSchema, `GET /jobs/${jobId}`)
+        },
+        `GET /jobs/${jobId}`,
+        'GET',
+        this.retryConfig
+      )
+    }
+
     return withRetry(
       async () => {
         const jobs = await base44.entities.Job.filter({ id: jobId })
@@ -212,6 +242,18 @@ export class APIClient {
    * GET /evidence — List evidence for a job
    */
   async getEvidence(jobId: string, limit = 200, config?: RequestConfig): Promise<Evidence[]> {
+    if (process.env.NODE_ENV === 'development') {
+      return withRetry(
+        async () => {
+          const response = await this.axios.get<Evidence[]>(`/jobs/${jobId}/evidence`)
+          return response.data.map((e) => validateResponse(e, EvidenceSchema, `GET /jobs/${jobId}/evidence`))
+        },
+        `GET /jobs/${jobId}/evidence`,
+        'GET',
+        this.retryConfig
+      )
+    }
+
     return withRetry(
       async () => {
         const evidence = await base44.entities.Evidence.filter({ job_id: jobId }, '-captured_at', limit)
@@ -227,6 +269,11 @@ export class APIClient {
    * GET /labels — List labels for a job
    */
   async getLabels(jobId: string, limit = 200, config?: RequestConfig): Promise<LabelRecord[]> {
+    if (process.env.NODE_ENV === 'development') {
+      // Mock labels endpoint not yet implemented, return empty for now
+      return []
+    }
+
     return withRetry(
       async () => {
         const labels = await base44.entities.LabelRecord.filter({ job_id: jobId }, '-labeled_at', limit)
@@ -257,6 +304,11 @@ export class APIClient {
    * GET /meetings — List meetings for a job
    */
   async getMeetings(jobId: string, limit = 50, config?: RequestConfig): Promise<Meeting[]> {
+    if (process.env.NODE_ENV === 'development') {
+      // Mock meetings endpoint not yet implemented, return empty for now
+      return []
+    }
+
     return withRetry(
       async () => {
         const meetings = await base44.entities.Meeting.filter({ job_id: jobId }, '-scheduled_at', limit)
