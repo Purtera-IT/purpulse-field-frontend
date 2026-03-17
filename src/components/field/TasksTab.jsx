@@ -78,14 +78,21 @@ export default function TasksTab({ job }) {
   const [overrideTask,   setOverrideTask]   = useState(null);
   const [phaseOverrides, setPhaseOverrides] = useState({});
 
-  // A phase is unlocked if all BLOCKING tasks in previous phases are done
+  // A phase is unlocked if all BLOCKING tasks in previous phases are done, or overridden
   const isPhaseUnlocked = (phaseIdx) => {
     if (phaseIdx === 0) return true;
+    if (phaseOverrides[phaseIdx]) return true;
     for (let i = 0; i < phaseIdx; i++) {
       const blockingTasks = phases[i].tasks.filter(t => t.gate === 'blocking');
       if (blockingTasks.some(t => t.status !== 'done')) return false;
     }
     return true;
+  };
+
+  const handlePhaseOverride = (phaseIdx, reason) => {
+    setPhaseOverrides(prev => ({ ...prev, [phaseIdx]: reason }));
+    toast.success(`Phase ${phaseIdx + 1} unlocked by override`);
+    setOverrideTask(null);
   };
 
   const handleTaskComplete = (phaseIdx, taskId) => {
