@@ -28,11 +28,12 @@ export default function LabelerModal({
   adapter = defaultAdapters.label,
   onClose, onSuccess,
 }) {
-  const [labelType,  setLabelType]  = useState('pass');
-  const [labelValue, setLabelValue] = useState('');
-  const [confidence, setConfidence] = useState(0.9);
-  const [notes,      setNotes]      = useState('');
-  const [bboxStr,    setBboxStr]    = useState('');
+  const [labelType,          setLabelType]          = useState('pass');
+  const [labelValue,         setLabelValue]         = useState('');
+  const [confidence,         setConfidence]         = useState(0.9);
+  const [notes,              setNotes]              = useState('');
+  const [bboxStr,            setBboxStr]            = useState('');
+  const [approvedForTraining,setApprovedForTraining] = useState(false);
 
   const presets = PRESET_VALUES[labelType] || [];
 
