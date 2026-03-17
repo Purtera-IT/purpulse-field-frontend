@@ -240,7 +240,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
               className="w-full h-12 rounded-md bg-[#0B2D5C] text-white font-semibold text-sm flex items-center justify-center gap-2 active:opacity-80"
               aria-label="Start work"
             >
-              <Play className="h-4 w-4" /> Start Work
+              <Play className="h-4 w-4" /> Ready to Start
             </button>
           )}
 
