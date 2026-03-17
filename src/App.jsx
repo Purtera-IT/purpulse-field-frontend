@@ -35,11 +35,11 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
+    } else if (authError.type === 'auth_required' || authError.type === 'auth_error') {
+      // Show unified error boundary with retry option
+      return <AuthErrorBoundary />;
     }
+    // offline_mode: allow app to continue in read-only state
   }
 
   // Render the main app
