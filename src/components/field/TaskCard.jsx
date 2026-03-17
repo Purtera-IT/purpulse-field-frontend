@@ -98,7 +98,7 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
 
   return (
     <div className={cn(
-      'rounded-2xl border overflow-hidden transition-all',
+      'rounded-[6px] border overflow-hidden transition-all',
       status === 'done'        ? 'border-emerald-200 bg-emerald-50/40'   :
       status === 'in_progress' ? 'border-blue-200 bg-blue-50/30'         :
       status === 'blocked'     ? 'border-red-200 bg-red-50/30'           :
