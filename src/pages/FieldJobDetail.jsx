@@ -109,6 +109,9 @@ export default function FieldJobDetail() {
   const tabProps = { job, evidence, labels, meetings, activities, auditLogs, onRefresh: invalidateAll };
   const activeDot = STATUS_DOT[job.status];
 
+  // Pass full job data to tabs (not just evidence)
+  const tabPropsWithJob = { ...tabProps };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
