@@ -47,15 +47,15 @@ function SectionCard({ title, children, dense }) {
   );
 }
 
-function ProgressBar({ pct, label }) {
+function ProgressBar({ pct, label, dense }) {
   const color = pct === 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-400' : 'bg-red-400';
   return (
     <div>
-      <div className="flex justify-between mb-1.5">
-        <p className="text-xs font-semibold text-slate-600">{label}</p>
-        <p className={cn('text-xs font-black tabular-nums', pct === 100 ? 'text-emerald-600' : 'text-slate-700')}>{pct}%</p>
+      <div className="flex justify-between mb-1">
+        <p className={cn('font-semibold text-slate-600', dense ? 'text-[10px]' : 'text-xs')}>{label}</p>
+        <p className={cn('font-black tabular-nums', dense ? 'text-[10px]' : 'text-xs', pct === 100 ? 'text-emerald-600' : 'text-slate-700')}>{pct}%</p>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className={cn('bg-slate-100 rounded-full overflow-hidden', dense ? 'h-1' : 'h-2')}>
         <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
       </div>
     </div>
