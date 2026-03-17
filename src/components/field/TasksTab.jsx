@@ -5,11 +5,12 @@
 import React, { useState } from 'react';
 import {
   CheckCircle2, Lock, ChevronDown, ChevronUp, AlertOctagon,
-  Zap, BarChart3,
+  Zap, BarChart3, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TaskCard from './TaskCard';
+import TaskOverrideModal from './TaskOverrideModal';
 import { getRunbook } from '../../lib/mockRunbook';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import BlockerForm from './BlockerForm';
