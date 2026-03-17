@@ -127,28 +127,55 @@ export class Base44UploadAdapter {
 
   /**
    * completeUpload — creates Evidence record after upload finishes
+   * Validates response before storing to prevent crashes from malformed data
    */
   async completeUpload(token, evidenceData, actorEmail = 'system') {
     const start = Date.now();
-    const record = await base44.entities.Evidence.create(evidenceData);
-    await writeAudit({
-      action_type: 'evidence_upload',
-      entity_type: 'evidence',
-      entity_id:   record.id,
-      actor_email: actorEmail,
-      job_id:      evidenceData.job_id,
-      payload: {
-        filename:      evidenceData.filename || '',
-        evidence_type: evidenceData.evidence_type,
-        size_bytes:    evidenceData.size_bytes,
-      },
-      duration_ms: Date.now() - start,
-    });
-    return record;
+    try {
+      const record = await base44.entities.Evidence.create(evidenceData);
+      const validated = validateEvidence(record);
+
+      if (!validated.success) {
+        console.warn('[Upload] Evidence validation failed:', validated.errors);
+      }
+
+      await writeAudit({
+        action_type: 'evidence_upload',
+        entity_type: 'evidence',
+        entity_id:   record.id || 'unknown',
+        actor_email: actorEmail,
+        job_id:      evidenceData.job_id,
+        payload: {
+          filename:      evidenceData.filename || '',
+          evidence_type: evidenceData.evidence_type,
+          size_bytes:    evidenceData.size_bytes,
+        },
+        duration_ms: Date.now() - start,
+      });
+
+      return validated.success ? validated.data : record;
+    } catch (err) {
+      console.error('[Upload] completeUpload failed:', err);
+      await writeAudit({
+        action_type: 'evidence_upload',
+        entity_type: 'evidence',
+        actor_email: actorEmail,
+        job_id:      evidenceData.job_id,
+        result:      'error',
+        error_message: err instanceof Error ? err.message : 'Unknown error',
+        duration_ms: Date.now() - start,
+      });
+      throw err;
+    }
   }
 
   async createManifestRow(data) {
-    return base44.entities.UploadManifest.create(data);
+    try {
+      return await base44.entities.UploadManifest.create(data);
+    } catch (err) {
+      console.error('[Upload] createManifestRow failed:', err);
+      throw err;
+    }
   }
 }
 
