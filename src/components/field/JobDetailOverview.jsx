@@ -73,7 +73,7 @@ function formatSchedule(job) {
   } catch { return job.scheduled_date; }
 }
 
-export default function JobDetailOverview({ job, onNavigateToTasks }) {
+export default function JobDetailOverview({ job, onNavigateToTasks, dense = false }) {
   const prio      = PRIORITY_CFG[job.priority] || PRIORITY_CFG.medium;
   const statusCfg = STATUS_CFG[job.status]     || STATUS_CFG.assigned;
   const syncCfg   = SYNC_CFG[job.sync_status]  || SYNC_CFG.synced;
