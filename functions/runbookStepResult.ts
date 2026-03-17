@@ -83,11 +83,11 @@ Deno.serve(async (req) => {
     job_id:          workOrderId,
   }).catch(() => {});
 
-  // ── 3. Patch job runbook_phases (best-effort) ─────────────────────
-  try {
-    const jobs = await base44.asServiceRole.entities.Job.filter({ id: workOrderId });
-    const job  = jobs[0];
-    if (job?.runbook_phases?.length) {
+  // ── 3. Patch job runbook_phases (fire-and-forget, non-blocking) ───
+  base44.asServiceRole.entities.Job.filter({ id: workOrderId })
+    .then(jobs => {
+      const job = jobs[0];
+      if (!job?.runbook_phases?.length) return;
       const phases = job.runbook_phases.map(phase => ({
         ...phase,
         steps: (phase.steps || []).map(s =>
@@ -96,9 +96,9 @@ Deno.serve(async (req) => {
             : s
         ),
       }));
-      await base44.asServiceRole.entities.Job.update(job.id, { runbook_phases: phases });
-    }
-  } catch (_) { /* non-fatal */ }
+      return base44.asServiceRole.entities.Job.update(job.id, { runbook_phases: phases });
+    })
+    .catch(() => {});
 
   /*
    * Sample request:
