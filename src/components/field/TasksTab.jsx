@@ -44,29 +44,26 @@ function OverallProgress({ phases, tasks }) {
   const blocking = allTasks.filter(t => t.gate === 'blocking' && t.status !== 'done').length;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-slate-500" />
-          <p className="text-sm font-black text-slate-900">Job Progress</p>
+    <div className="bg-white rounded-[8px] border border-slate-100 px-3 py-2 mb-2">
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className={cn('h-full rounded-full transition-all', pct === 100 ? 'bg-emerald-500' : 'bg-blue-500')} style={{ width: `${pct}%` }} />
         </div>
-        <span className={cn('text-lg font-black tabular-nums', pct === 100 ? 'text-emerald-600' : 'text-slate-700')}>{pct}%</span>
+        <span className={cn('text-[11px] font-black tabular-nums flex-shrink-0', pct === 100 ? 'text-emerald-600' : 'text-slate-700')}>{pct}%</span>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
-        <div
-          className={cn('h-full rounded-full transition-all', pct === 100 ? 'bg-emerald-500' : 'bg-blue-500')}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="flex items-center gap-4 text-[11px]">
-        <span className="text-emerald-600 font-bold">{done} complete</span>
-        <span className="text-slate-400">{total - done} remaining</span>
+      <div className="flex items-center gap-3 text-[10px]">
+        <span className="text-emerald-600 font-bold">{done} done</span>
+        <span className="text-slate-400">{total - done} left</span>
         {blocking > 0 && (
           <span className="text-red-600 font-black flex items-center gap-1">
             <Zap className="h-2.5 w-2.5" /> {blocking} blocking
           </span>
         )}
-        {pct === 100 && <span className="text-emerald-600 font-black ml-auto">✓ All tasks complete</span>}
+        {pct === 100 && (
+          <span className="inline-flex items-center gap-1 text-emerald-700 font-black bg-emerald-50 border border-emerald-200 px-1.5 py-px rounded-[4px] ml-auto">
+            ✓ All done
+          </span>
+        )}
       </div>
     </div>
   );
