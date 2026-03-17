@@ -49,7 +49,7 @@ function StopModal({ elapsed, onConfirm, onCancel, isPending }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true" aria-label="Stop timer confirmation">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative w-full bg-white rounded-t-3xl p-6 pb-10 shadow-2xl max-w-lg mx-auto">
+      <div className="relative w-full bg-white rounded-t-[12px] p-6 pb-10 shadow-[0_2px_6px_rgba(15,23,36,0.06)] max-w-lg mx-auto">
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-6" />
 
         <div className="flex flex-col items-center text-center mb-6">
@@ -62,7 +62,7 @@ function StopModal({ elapsed, onConfirm, onCancel, isPending }) {
           </p>
         </div>
 
-        <div className="bg-slate-50 rounded-2xl p-3 text-xs text-slate-500 mb-5 font-mono leading-relaxed">
+        <div className="bg-slate-50 rounded-[8px] p-3 text-xs text-slate-500 mb-5 font-mono leading-relaxed">
           <p className="text-slate-400 mb-1 font-sans font-semibold text-[10px] uppercase tracking-wide">Event payload</p>
           {`{ "event_type": "work_stop", "device_ts": "${new Date().toISOString()}" }`}
         </div>
@@ -70,14 +70,14 @@ function StopModal({ elapsed, onConfirm, onCancel, isPending }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 h-14 rounded-2xl border-2 border-slate-200 text-slate-700 font-semibold text-sm active:opacity-70"
+            className="flex-1 h-12 rounded-[8px] border-2 border-slate-200 text-slate-700 font-semibold text-sm active:opacity-70"
           >
             Keep Working
           </button>
           <button
             onClick={onConfirm}
             disabled={isPending}
-            className="flex-1 h-14 rounded-2xl bg-red-600 text-white font-semibold text-sm active:opacity-80 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-[8px] bg-red-600 text-white font-semibold text-sm active:opacity-80 disabled:opacity-50 flex items-center justify-center gap-2"
             aria-label="Confirm stop timer"
           >
             {isPending
@@ -161,7 +161,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
   if (compact) {
     return (
       <div className="flex items-center gap-2 flex-1">
-        <span className={cn('h-2 w-2 rounded-full flex-shrink-0', cfg.dot, activeState.state !== 'idle' && 'motion-safe:animate-pulse')} />
+        <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)} />
         <span className="text-xs font-bold text-white opacity-90">{statusLabel || cfg.label}</span>
         <span className="font-mono font-black text-sm tabular-nums text-white ml-1">{fmt(elapsed)}</span>
       </div>
@@ -170,7 +170,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
 
   return (
     <>
-      <div className={cn('rounded-3xl p-5 transition-colors duration-300', cfg.bg)}>
+      <div className={cn('rounded-[8px] p-4 transition-colors duration-300', cfg.bg)}>
 
         {/* Status badge — small rectangular enterprise style */}
         <div className="flex items-center justify-center mb-3">
@@ -182,7 +182,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
             aria-live="polite" aria-atomic="true" aria-label={`Timer state: ${cfg.label}`}
           >
             <span
-              className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot, activeState.state !== 'idle' && cfg.pulse && 'motion-safe:animate-pulse')}
+              className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)}
               aria-hidden="true"
             />
             {statusLabel || cfg.label}
