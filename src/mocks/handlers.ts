@@ -166,4 +166,6 @@ export const handlers = [
     await scenarioDelay();
     return HttpResponse.json({ success: true });
   }),
+
+  ...uploadHandlers,
 ];
