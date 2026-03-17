@@ -227,6 +227,7 @@ export default function Jobs() {
       {showAdvanced && (
         <div className="sticky top-[60px] z-40 max-w-2xl mx-auto w-full px-4 py-3 bg-white border-b border-slate-100">
           <div className="grid grid-cols-3 gap-3">
+      </div>
             {/* Priority */}
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Priority</p>
