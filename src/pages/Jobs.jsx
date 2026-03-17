@@ -286,7 +286,7 @@ export default function Jobs() {
       )}
 
       {/* ── Status line ── */}
-      <div className="max-w-2xl mx-auto w-full px-4 py-2 flex items-center gap-2 text-[11px] bg-white border-b border-slate-50">
+      <div className="sticky top-[120px] z-30 max-w-2xl mx-auto w-full px-4 py-2 flex items-center gap-2 text-[11px] bg-white border-b border-slate-50">
         <span className="text-slate-500">{filtered.length} work order{filtered.length !== 1 ? 's' : ''}</span>
         {dbJobs.length === 0 && !isLoading && (
           <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-[3px] border border-slate-100">Demo data</span>
