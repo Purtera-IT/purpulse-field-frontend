@@ -8,7 +8,11 @@ import {
   User, LogOut, Smartphone, Shield, Bell, MapPin, Camera,
   ChevronRight, ShieldCheck, AlertTriangle, XCircle, Star,
   Clock, Briefcase, TrendingUp, Info, Eye, Link as LinkIcon,
+  SlidersHorizontal, Palette,
 } from 'lucide-react';
+import DensityToggle from '../components/ui/DensityToggle';
+import ThemeToggle from '../components/ui/ThemeToggle';
+import { useAppPreferences } from '../hooks/useAppPreferences';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
