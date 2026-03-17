@@ -14,6 +14,7 @@ import GalleryImport from './GalleryImport';
 import UploadQueue from './UploadQueue';
 import CameraOverlay from './CameraOverlay';
 import { cn } from '@/lib/utils';
+import { telemetryEvidenceUploadStart } from '@/lib/telemetry';
 
 // steps: 'source' | 'metadata' | 'gallery' | 'queue'
 
