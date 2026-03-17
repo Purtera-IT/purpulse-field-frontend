@@ -1,0 +1,66 @@
+/**
+ * enterprise-typography.css — Global base typography using enterprise token scale.
+ *
+ * Sets font-family, box-sizing, and base font-size for both density modes.
+ * Import this after enterprise.css in globals.css.
+ */
+
+/* ── Box-sizing reset ────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ── Font stack ──────────────────────────────────────────────────── */
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--ent-text-body);        /* 14px default */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Comfortable density (explicit or default) ───────────────────── */
+body,
+body.density-comfortable {
+  --ent-text-body:    14px;
+  --ent-text-caption: 11px;
+  --ent-text-h1:      20px;
+  --ent-text-h2:      16px;
+  --ent-text-h3:      14px;
+  --ent-space-xs:      4px;
+  --ent-space-sm:      8px;
+  --ent-space-md:     12px;
+  --ent-space-lg:     16px;
+  --ent-space-xl:     24px;
+  --ent-space-xxl:    32px;
+  --ent-radius-card:  var(--ent-radius-lg);   /* 12px */
+  --ent-card-padding: var(--ent-space-lg);    /* 16px */
+}
+
+/* ── Compact density ─────────────────────────────────────────────── */
+body.density-compact {
+  --ent-text-body:    12px;
+  --ent-text-caption: 10px;
+  --ent-text-h1:      17px;
+  --ent-text-h2:      14px;
+  --ent-text-h3:      12px;
+  --ent-space-xs:      2px;
+  --ent-space-sm:      4px;
+  --ent-space-md:      8px;
+  --ent-space-lg:     12px;
+  --ent-space-xl:     16px;
+  --ent-space-xxl:    24px;
+  --ent-radius-card:  var(--ent-radius-md);   /* 8px */
+  --ent-card-padding: var(--ent-space-md);    /* 8px */
+}
+
+/* ── Utility: apply density-aware card style ─────────────────────── */
+.ent-card {
+  border-radius: var(--ent-radius-card);
+  padding: var(--ent-card-padding);
+  box-shadow: var(--ent-shadow-sm);
+}
