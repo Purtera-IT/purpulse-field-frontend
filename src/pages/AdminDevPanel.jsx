@@ -156,7 +156,36 @@ export default function AdminDevPanel() {
           Mock backend — adapters read <code className="bg-slate-100 px-1 rounded">localStorage.purpulse_storage_backend</code>
         </p>
 
-        {/* MSW Mock Scenarios */}
+        {/* Token Expiry Simulation */}
+      <section className="mb-6">
+        <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Token Management</h2>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-white rounded-[8px] border border-slate-200">
+            <label className="flex items-center gap-2 flex-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tokenExpired}
+                onChange={(e) => {
+                  setTokenExpired(e.target.checked);
+                  if (e.target.checked) {
+                    localStorage.setItem('purpulse_access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiZXhwIjoxNjAwMDAwMDAwfQ.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U');
+                  } else {
+                    localStorage.removeItem('purpulse_access_token');
+                  }
+                }}
+                className="h-4 w-4 rounded border-slate-300 cursor-pointer"
+              />
+              <span className="text-sm font-semibold text-slate-700">Simulate Expired Access Token</span>
+            </label>
+            {tokenExpired && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded">Active</span>}
+          </div>
+          <p className="text-[10px] text-slate-500">
+            When enabled, next API request will receive 401 and trigger token refresh flow (refresh → retry original request)
+          </p>
+        </div>
+      </section>
+
+      {/* MSW Mock Scenarios */}
         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">MSW Mock Scenarios</h3>
         <div className="flex flex-wrap gap-2">
           {[
