@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
 // ── Enterprise design tokens ─────────────────────────────────────────
-const ent = require('./src/design-tokens/design-tokens.enterprise.json');
+const ent = require('./design-tokens/design-tokens.enterprise.json');
 
 module.exports = {
     darkMode: ["class"],
