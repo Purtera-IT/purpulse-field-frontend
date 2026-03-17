@@ -248,48 +248,31 @@ export default function Jobs() {
             </div>
           </div>
 
-          {/* Row 2: status chips + advanced filter toggle */}
+          {/* Row 2: compact status filter toggles */}
           <div className="flex items-center gap-1.5">
-            <div
-              className="flex gap-1.5 overflow-x-auto flex-1"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {STATUS_CHIPS.map(f => (
-                <button
-                  key={f.value}
-                  onClick={() => setStatusFilter(f.value)}
-                  className={cn(
-                    'flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex-shrink-0',
-                    statusFilter === f.value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
-                  )}
-                >
-                  {f.label}
-                  <span className={cn('text-[10px] font-black px-1 rounded-full',
-                    statusFilter === f.value ? 'bg-white/20 text-white' : 'text-slate-400'
-                  )}>
-                    {allJobs.filter(j => matchesStatus(j, f.value)).length}
-                  </span>
-                </button>
-              ))}
+            <div className="flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              <FilterToggle
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={STATUS_CHIPS.map(f => ({
+                  value: f.value,
+                  label: f.label,
+                  count: allJobs.filter(j => matchesStatus(j, f.value)).length,
+                }))}
+              />
             </div>
-
-            {/* Advanced filters toggle */}
             <button
               onClick={() => setShowAdvanced(v => !v)}
               className={cn(
-                'flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-bold flex-shrink-0 transition-all',
+                'flex items-center gap-1 h-7 px-2 rounded-[4px] border text-[11px] font-semibold flex-shrink-0 transition-colors',
                 showAdvanced || activeFilterCount > 0
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-500 border-slate-200'
+                  ? 'bg-[#0F1724] text-white border-[#0F1724]'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
               )}
               aria-label="Advanced filters"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              {activeFilterCount > 0 && (
-                <span className="bg-white/20 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
+              <SlidersHorizontal className="h-3 w-3" />
+              {activeFilterCount > 0 && <span className="text-[10px] font-black">{activeFilterCount}</span>}
             </button>
           </div>
 
