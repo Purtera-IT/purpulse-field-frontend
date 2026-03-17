@@ -97,6 +97,7 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <Toaster />
+          <TelemetryConsent />
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>
