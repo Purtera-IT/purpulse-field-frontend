@@ -153,12 +153,12 @@ export default function FieldJobDetail() {
         <OfflineEditsIndicator jobId={jobId} isOnline={isOnline} />
         <UploadProgressIndicator jobId={jobId} isOnline={isOnline} />
         <div>
-          {tab === 'overview'  && <JobOverview       {...tabProps} />}
-          {tab === 'runbook'   && <RunbookSteps       {...tabProps} />}
-          {tab === 'evidence'  && <EvidenceGalleryView {...tabProps} />}
-          {tab === 'timelog'   && <FieldTimeTracker    {...tabProps} />}
-          {tab === 'meetings'  && <MeetingsTab         {...tabProps} />}
-          {tab === 'audit'     && <AuditTab            {...tabProps} />}
+          {tab === 'overview'  && <JobOverview       {...tabPropsWithJob} />}
+          {tab === 'runbook'   && <RunbookSteps       {...tabPropsWithJob} />}
+          {tab === 'evidence'  && <EvidenceGalleryView {...tabPropsWithJob} />}
+          {tab === 'timelog'   && <FieldTimeTracker    {...tabPropsWithJob} />}
+          {tab === 'meetings'  && <MeetingsTab         {...tabPropsWithJob} />}
+          {tab === 'audit'     && <AuditTab            {...tabPropsWithJob} />}
         </div>
       </div>
     </div>
