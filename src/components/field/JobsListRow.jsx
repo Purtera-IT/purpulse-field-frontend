@@ -80,7 +80,7 @@ export default function JobsListRow({ job }) {
       {/* Right: active indicator + chevron */}
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
         {isActive && (
-          <span className="text-[10px] font-bold font-mono tabular-nums text-[#0B2D5C] bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-[4px] leading-none">
+          <span className="text-[10px] font-bold font-mono tabular-nums text-[#0B2D5C] bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-[4px] leading-none" aria-label="Job in progress">
             LIVE
           </span>
         )}
