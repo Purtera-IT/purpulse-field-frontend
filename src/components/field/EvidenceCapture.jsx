@@ -98,6 +98,50 @@ export default function EvidenceCapture({ jobId, evidenceType, stepId, onCapture
           onOpenGallery={() => { setShowOverlay(false); setStep('gallery'); }}
         />
       )}
+      {/* ── Re-attach prompt (files lost from IndexedDB) ─── */}
+      {(reattachItems.length > 0 || expiredItems.length > 0) && (
+        <div className="space-y-2 mb-1">
+          {reattachItems.map(item => (
+            <div key={item.id} className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-amber-800">File lost — re-add required</p>
+                <p className="text-[11px] text-amber-600 truncate">{item.filename}</p>
+              </div>
+              <button
+                onClick={() => { setReattachTarget(item.id); reattachInputRef.current?.click(); }}
+                className="flex items-center gap-1 h-8 px-3 rounded-xl bg-amber-600 text-white text-[11px] font-bold flex-shrink-0 active:opacity-80"
+              >
+                <RotateCcw className="h-3 w-3" /> Re-add
+              </button>
+            </div>
+          ))}
+          {expiredItems.map(item => (
+            <div key={item.id} className="flex items-start gap-3 px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl">
+              <AlertTriangle className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-600">Upload expired</p>
+                <p className="text-[11px] text-slate-400 truncate">{item.filename} — please recapture</p>
+              </div>
+              <button
+                onClick={() => cancelItem(item.id)}
+                className="h-8 px-3 rounded-xl bg-slate-200 text-slate-600 text-[11px] font-bold flex-shrink-0 active:opacity-80"
+              >
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hidden file input for re-attach */}
+      <input
+        ref={reattachInputRef}
+        type="file" accept="image/*"
+        className="hidden"
+        onChange={handleReattach}
+      />
+
       <div className="space-y-3">
         {/* Camera — primary action (full overlay) */}
         <button
