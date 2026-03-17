@@ -158,7 +158,7 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
                 : state === 'traveling' ? 'bg-blue-600 text-white'
                 : 'bg-slate-900 text-white';
 
-  const timerLabel = state === 'idle' ? 'Start' : state === 'on_break' ? 'Resume' : state === 'working' ? 'Pause' : '●';
+  const timerLabel = state === 'idle' ? 'Ready' : state === 'on_break' ? 'Resume' : state === 'working' ? 'Working' : '●';
 
   const ACTION_BTNS = [
     { id: 'photo',   Icon: Camera,        label: 'Photo',   cls: 'text-slate-700', bg: 'bg-slate-100' },
