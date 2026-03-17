@@ -46,7 +46,7 @@ export default function JobsListRow({ job }) {
     <Link
       to={`/JobDetail?id=${job.id}`}
       className={cn(
-        'flex items-center gap-3 py-3 px-4 bg-white border border-neutral-200 rounded-[6px] border-l-4 active:bg-slate-50 transition-colors',
+        'flex items-center gap-3 py-3 px-4 bg-white border border-neutral-200 rounded-[6px] border-l-4 active:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] focus:ring-offset-2',
         stripeCls
       )}
     >
