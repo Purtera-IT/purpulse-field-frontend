@@ -5,6 +5,7 @@ import { Play, Pause, Square, Coffee, Car, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { telemetryTimeClockStart, telemetryTimeClockStop } from '@/lib/telemetry';
 
 // ── helpers ──────────────────────────────────────────────────────────
 function fmt(s) {
