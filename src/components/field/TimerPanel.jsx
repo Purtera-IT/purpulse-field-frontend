@@ -189,10 +189,10 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           </div>
         </div>
 
-        {/* Numeric display — reduced scale */}
+        {/* Numeric display — capped at 48px */}
         <div
           className={cn('text-center font-mono font-bold tabular-nums leading-none mb-1 transition-colors', cfg.fg)}
-          style={{ fontSize: 'clamp(36px, 9vw, 56px)', letterSpacing: '-0.02em' }}
+          style={{ fontSize: 'clamp(32px, 8vw, 48px)', letterSpacing: '-0.02em' }}
           aria-live="off"
           aria-label={`Elapsed time ${fmt(elapsed)}`}
         >
@@ -200,76 +200,74 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
         </div>
 
         {/* Metadata line */}
-        <p className="text-center text-[10px] text-slate-400 mb-5 font-mono tabular-nums">
+        <p className="text-center text-[10px] text-slate-400 mb-4 font-mono tabular-nums">
           Total work · {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
 
-        {/* CTAs — rectangular enterprise buttons */}
-        <div className="flex gap-2.5" role="group" aria-label="Timer controls">
+        {/* CTAs */}
+        <div className="flex gap-2" role="group" aria-label="Timer controls">
 
-          {/* Break / End Break */}
           {activeState.state === 'working' && (
             <button
               onClick={() => fire('break_start', 'Break started')}
-              className="flex-1 min-h-[44px] h-11 rounded-[8px] bg-white/70 text-amber-700 font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-70 transition-opacity border border-amber-200"
+              className="flex-1 h-12 rounded-md bg-white/70 text-amber-700 font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-70 border border-amber-200"
               aria-label="Start break"
             >
-              <Coffee className="h-5 w-5" /> Break
+              <Coffee className="h-4 w-4" /> Break
             </button>
           )}
           {activeState.state === 'on_break' && (
             <button
               onClick={() => fire('break_end', 'Break ended')}
-              className="flex-1 min-h-[44px] h-11 rounded-[8px] bg-[#0E8A5F] text-white font-bold text-sm flex items-center justify-center gap-1.5 active:opacity-80 shadow-[0_2px_6px_rgba(15,23,36,0.18)]"
+              className="flex-1 h-12 rounded-md bg-[#0E8A5F] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
               aria-label="End break"
             >
-              <Play className="h-5 w-5" /> Resume
+              <Play className="h-4 w-4" /> Resume
             </button>
           )}
           {activeState.state === 'traveling' && (
             <button
               onClick={() => fire('travel_end', 'Arrived on site')}
-              className="flex-1 min-h-[44px] h-11 rounded-[8px] bg-[#0B66B2] text-white font-bold text-sm flex items-center justify-center gap-1.5 active:opacity-80 shadow-[0_2px_6px_rgba(15,23,36,0.18)]"
+              className="flex-1 h-12 rounded-md bg-[#0B66B2] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
               aria-label="Mark as arrived"
             >
-              <Check className="h-5 w-5" /> Arrived
+              <Check className="h-4 w-4" /> Arrived
             </button>
           )}
           {activeState.state === 'idle' && (
             <button
               onClick={() => fire('work_start', 'Work started')}
-              className="flex-1 min-h-[44px] h-11 rounded-[8px] bg-[#0B2D5C] text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80 shadow-[0_2px_6px_rgba(15,23,36,0.18)]"
+              className="w-full h-12 rounded-md bg-[#0B2D5C] text-white font-semibold text-sm flex items-center justify-center gap-2 active:opacity-80"
               aria-label="Start work"
             >
-              <Play className="h-5 w-5" /> Start Work
+              <Play className="h-4 w-4" /> Start Work
             </button>
           )}
 
-          {/* Working state: compact Pause icon + rectangular End Session */}
           {activeState.state === 'working' && (
             <>
               <button
                 onClick={() => fire('travel_start', 'Travel started')}
-                className="min-h-[44px] h-11 w-11 rounded-[8px] bg-white/70 text-blue-600 flex items-center justify-center active:opacity-70 flex-shrink-0 border border-blue-200"
+                className="h-12 w-11 rounded-md bg-white/70 text-blue-600 flex items-center justify-center active:opacity-70 flex-shrink-0 border border-blue-200"
                 aria-label="Start travel"
                 title="Start travel"
               >
-                <Car className="h-5 w-5" aria-hidden="true" />
+                <Car className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 onClick={() => setShowStop(true)}
-                className="flex-1 min-h-[44px] h-11 rounded-[8px] bg-red-600 text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80 shadow-[0_2px_6px_rgba(15,23,36,0.18)]"
+                className="flex-1 h-12 rounded-md bg-red-600 text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
                 aria-label="End work session"
               >
-                <Square className="h-5 w-5" aria-hidden="true" /> End Session
+                <Square className="h-4 w-4" aria-hidden="true" /> End Session
               </button>
             </>
           )}
         </div>
 
-        {/* Thumb-zone hint */}
-        <p className="text-center text-[10px] text-slate-300 mt-3 select-none">
-          All controls reachable one-handed · hold phone normally
+        {/* Accessibility hint — visually hidden */}
+        <p className="sr-only" aria-hidden="true">
+          All controls reachable one-handed
         </p>
       </div>
 
