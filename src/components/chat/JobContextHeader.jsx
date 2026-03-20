@@ -2,7 +2,7 @@
  * JobContextHeader — compact job context strip shown above chat.
  */
 import React from 'react';
-import { MapPin, ClipboardList, Zap } from 'lucide-react';
+import { MapPin, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STATUS_CFG = {

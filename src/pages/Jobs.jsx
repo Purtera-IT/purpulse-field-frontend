@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseISO, isToday, isTomorrow, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 import {
-  Loader2, LayoutGrid, List, CalendarDays, Table2,
-  SlidersHorizontal, X, ChevronRight, WifiOff, RefreshCw, Camera,
+  Loader2, X, ChevronRight, WifiOff, RefreshCw, Camera,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

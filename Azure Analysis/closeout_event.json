@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "closeout_event",
+  "description": "Canonical closeout_event for core.fact_closeout_event (Iteration 9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "closeout_submit_timestamp",
+    "documentation_complete_flag",
+    "customer_signature_flag",
+    "runbook_complete_flag",
+    "required_fields_complete_flag"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "closeout_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "closeout_submit_timestamp": { "type": "string", "format": "date-time" },
+    "documentation_complete_flag": { "type": "boolean" },
+    "customer_signature_flag": { "type": "boolean" },
+    "runbook_complete_flag": { "type": "boolean" },
+    "required_fields_complete_flag": { "type": "boolean" },
+    "invoice_support_docs_flag": { "type": ["boolean", "null"] },
+    "portal_update_flag": { "type": ["boolean", "null"] },
+    "timecard_submitted_flag": { "type": ["boolean", "null"] }
+  }
+}

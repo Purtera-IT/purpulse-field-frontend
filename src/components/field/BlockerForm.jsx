@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertTriangle, Loader2, Camera } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { emitEscalationEvent } from '@/lib/escalationEvent';
+import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
 import EvidenceCapture from './EvidenceCapture';
 
 const BLOCKER_TYPES = [
@@ -26,7 +29,14 @@ const SEVERITY_LEVELS = [
   { value: 'critical', label: 'Critical' },
 ];
 
-export default function BlockerForm({ jobId, onClose }) {
+/**
+ * @param {Object} props
+ * @param {string} props.jobId
+ * @param {() => void} [props.onClose]
+ * @param {(payload?: { blocker: Record<string, unknown>; blockerType: string; severityLevel: string; noteText: string }) => void | Promise<void>} [props.onSubmitted] — called after create + canonical `blocker_create` escalation enqueue attempt
+ */
+export default function BlockerForm({ jobId, onClose, onSubmitted }) {
+  const { user } = useAuth();
   const [type, setType] = useState('');
   const [severity, setSeverity] = useState('medium');
   const [note, setNote] = useState('');
@@ -35,18 +45,36 @@ export default function BlockerForm({ jobId, onClose }) {
   const queryClient = useQueryClient();
 
   const createBlocker = useMutation({
-    mutationFn: () => base44.entities.Blocker.create({
-      job_id: jobId,
-      blocker_type: type,
-      severity,
-      note,
-      photo_evidence_ids: photoIds,
-      status: 'open',
-      sync_status: 'pending',
-    }),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const blocker = await base44.entities.Blocker.create({
+        job_id: jobId,
+        blocker_type: type,
+        severity,
+        note,
+        photo_evidence_ids: photoIds,
+        status: 'open',
+        sync_status: 'pending',
+      });
+      return { blocker, blockerType: type, severityLevel: severity, noteText: note };
+    },
+    onSuccess: async ({ blocker, blockerType, severityLevel, noteText }) => {
       queryClient.invalidateQueries({ queryKey: ['blockers', jobId] });
       toast.success('Blocker reported');
+      try {
+        const jobCtx = await fetchJobContextForArtifactEvent(jobId);
+        await emitEscalationEvent({
+          job: { id: jobId, ...jobCtx },
+          user,
+          reasonCategory: blockerType,
+          escalationSource: 'blocker_create',
+          severity: severityLevel,
+          escalationRecordId: blocker?.id != null ? String(blocker.id) : null,
+          notesPreview: noteText,
+        });
+      } catch (err) {
+        console.warn('[escalation_event] enqueue failed after blocker create', err);
+      }
+      onSubmitted?.({ blocker, blockerType, severityLevel, noteText });
       onClose?.();
     },
   });

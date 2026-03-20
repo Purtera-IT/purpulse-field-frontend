@@ -1,6 +1,10 @@
 /**
  * Telemetry — Lightweight event tracking with privacy-first design
- * 
+ *
+ * Note: Base44 analytics here is separate from canonical Azure ingest (see
+ * src/lib/telemetryEnvelope.js + src/lib/locationConsent.js), which use
+ * purpulse_perm_location and strip precise GPS unless granted.
+ *
  * Features:
  * - Opt-in consent (default: disabled until user agrees)
  * - Automatic PII scrubbing

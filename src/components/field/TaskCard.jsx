@@ -3,7 +3,7 @@
  * Collapsed: summary, gate badge, deliverable count, QC warnings.
  * Expanded: instructions, tips/mistakes, checks, deliverables, actions.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   ChevronDown, ChevronUp, Clock, CheckCircle2, AlertOctagon,
   Circle, PlayCircle, XCircle, Lightbulb, ClipboardCheck,
@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import DeliverableItem from './deliverables/DeliverableItem';
 import { telemetryRunbookStepComplete } from '@/lib/telemetry';
+import { useAuth } from '@/lib/AuthContext';
+import { emitRunbookStepEvent } from '@/lib/runbookStepEvent';
 
 const GATE_CFG = {
   blocking: { bg: 'bg-red-500',   label: 'Blocking', tip: 'Cannot proceed until complete' },
@@ -47,7 +49,19 @@ function CheckRow({ check, onToggle }) {
   );
 }
 
-export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, onComplete, onEscalate }) {
+export default function TaskCard({
+  task,
+  job,
+  phaseId = null,
+  phaseColor,
+  orderNum,
+  isPhaseUnlocked,
+  onComplete,
+  onEscalate,
+}) {
+  const { user } = useAuth();
+  const progressStartedAt = useRef(null);
+  const effectiveJob = job ?? (task.job_id != null ? { id: task.job_id } : null);
   const [expanded,  setExpanded]  = useState(task.status === 'in_progress');
   const [checks,    setChecks]    = useState(task.checks || []);
   const [status,    setStatus]    = useState(task.status);
@@ -86,17 +100,60 @@ export default function TaskCard({ task, phaseColor, orderNum, isPhaseUnlocked, 
 
   const handleToggleCheck = (id) => setChecks(prev => prev.map(c => c.id === id ? { ...c, done: !c.done } : c));
 
-  const handleStart = () => {
-    if (status === 'pending' && isPhaseUnlocked) { setStatus('in_progress'); setExpanded(true); }
+  const phaseMeta = {
+    sr_version: String(effectiveJob?.runbook_version ?? '0.0.0'),
   };
 
-  const handleComplete = () => {
-    if (!canComplete) return;
+  const stepForEvent = {
+    id: task.id,
+    title: task.title,
+    name: task.title,
+    step_family: task.step_family ?? task.family ?? task.category,
+  };
+
+  const handleStart = async () => {
+    if (status !== 'pending' || !isPhaseUnlocked || !effectiveJob?.id) return;
+    try {
+      await emitRunbookStepEvent({
+        job: effectiveJob,
+        user,
+        step: stepForEvent,
+        phaseMeta,
+        phaseId: phaseId ?? task.phase_id ?? null,
+        stepOutcome: 'started',
+        durationMinutes: 0,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+      return;
+    }
+    progressStartedAt.current = Date.now();
+    setStatus('in_progress');
+    setExpanded(true);
+  };
+
+  const handleComplete = async () => {
+    if (!canComplete || !effectiveJob?.id) return;
+    const mins =
+      progressStartedAt.current != null
+        ? Math.max(0, Math.round((Date.now() - progressStartedAt.current) / 60000))
+        : 0;
+    try {
+      await emitRunbookStepEvent({
+        job: effectiveJob,
+        user,
+        step: stepForEvent,
+        phaseMeta,
+        phaseId: phaseId ?? task.phase_id ?? null,
+        stepOutcome: 'pass',
+        durationMinutes: mins,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+      return;
+    }
     setStatus('done');
-    
-    // Track telemetry
-    telemetryRunbookStepComplete(task.job_id, task.title, 0); // Duration would need startTime tracking
-    
+    telemetryRunbookStepComplete(effectiveJob.id, task.title, mins * 60);
     onComplete?.(task.id);
     toast.success(`✓ ${task.title}`, { duration: 2500 });
   };

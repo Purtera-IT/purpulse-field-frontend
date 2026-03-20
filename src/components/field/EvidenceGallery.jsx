@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { Trash2, AlertTriangle, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import EvidenceTile from './EvidenceTile';
 import EvidenceDetailSheet from './EvidenceDetailSheet';

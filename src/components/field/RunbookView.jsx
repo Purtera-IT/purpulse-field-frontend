@@ -17,12 +17,14 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
-  CheckCircle2, Circle, XCircle, RotateCcw, ChevronRight,
+  CheckCircle2, Circle, RotateCcw, ChevronRight,
   AlertTriangle, Lock, Camera, FileText, ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import RunbookStepModal from './RunbookStepModal';
+import { useAuth } from '@/lib/AuthContext';
+import { emitRunbookStepEvent } from '@/lib/runbookStepEvent';
 
 // ── Result config ─────────────────────────────────────────────────────
 const RESULT_CFG = {
@@ -156,6 +158,7 @@ function PhaseHeader({ phase, completedSteps, totalSteps }) {
 export default function RunbookView({ job }) {
   const [activeStep, setActiveStep] = useState(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const phases = job?.runbook_phases || [];
 
   const { data: evidence = [] } = useQuery({
@@ -166,6 +169,38 @@ export default function RunbookView({ job }) {
 
   const completeStep = useMutation({
     mutationFn: async ({ stepId, result, overrideReason }) => {
+      let targetStep = null;
+      let containingPhase = null;
+      for (const phase of phases) {
+        const st = phase.steps?.find((s) => s.id === stepId);
+        if (st) {
+          targetStep = st;
+          containingPhase = phase;
+          break;
+        }
+      }
+      const stepOutcome = overrideReason
+        ? 'overridden'
+        : result === 'fail_remediated'
+          ? 'fail_remediated'
+          : 'pass';
+      try {
+        await emitRunbookStepEvent({
+          job,
+          user,
+          step: targetStep || { id: stepId, name: 'unknown_step' },
+          phaseMeta: containingPhase?.meta || {},
+          phaseId: containingPhase?.id ?? null,
+          stepOutcome,
+          durationMinutes: 0,
+          reworkFlag: result === 'fail_remediated' ? true : null,
+          blockerFlag: null,
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+        throw e;
+      }
+
       const updatedPhases = phases.map(phase => ({
         ...phase,
         steps: phase.steps?.map(step =>

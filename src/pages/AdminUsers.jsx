@@ -10,7 +10,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Users, Smartphone, UserPlus, RefreshCw, CheckCircle2, Shield, Eye, Wrench, Crown, Search } from 'lucide-react';
+import { Users, Smartphone, UserPlus, RefreshCw, Shield, Eye, Wrench, Crown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import AdminShell from '../components/admin/AdminShell';

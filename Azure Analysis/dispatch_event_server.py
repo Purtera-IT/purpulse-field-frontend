@@ -1,0 +1,349 @@
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timedelta, timezone
+
+from flask import Blueprint, jsonify, request
+from jsonschema import Draft202012Validator
+from azure.identity import DefaultAzureCredential
+from azure.eventhub import EventHubProducerClient, EventData
+from azure.data.tables import TableServiceClient
+
+SCHEMA = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dispatch_event",
+  "description": "Canonical dispatch_event payload for core.fact_dispatch_event. telemetry envelope for core.fact_dispatch_event. Refs: TechPulse_Field_App_Data_Collection_and_Model_Mapping_Guide.md:61-81,87-110.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "status"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "event_name": {
+      "type": "string"
+    },
+    "event_ts_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "client_ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_system": {
+      "type": "string",
+      "const": "field_app"
+    },
+    "project_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "device_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "dispatch_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "technician_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "connectivity_state": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "offline",
+        "cellular",
+        "wifi",
+        "unknown",
+        null
+      ]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": [
+        "location",
+        "device"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "type": "boolean"
+        },
+        "device": {
+          "type": "boolean"
+        }
+      }
+    },
+    "location": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "assigned",
+        "enroute",
+        "arrived",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "rescheduled",
+        "declined"
+      ]
+    },
+    "assignment_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "accept_flag": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "decline_flag": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "offer_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "cancel_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "planned_eta_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "eta_ack_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "eta_update_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "route_departure_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "scheduled_start_timestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  },
+  "examples": [
+    {
+      "event_id": "9c2c8b6b-1f0d-4b1c-8f48-01b52d9f2e2e",
+      "schema_version": "1.0.0",
+      "event_name": "dispatch_event",
+      "event_ts_utc": "2026-03-18T14:05:22.000Z",
+      "client_ts": "2026-03-18T14:05:20.111Z",
+      "source_system": "field_app",
+      "project_id": "purpulse.app",
+      "device_id": "dev-a1b2c3",
+      "session_id": "sess-abc123",
+      "job_id": "job_123",
+      "dispatch_id": "disp_456",
+      "assignment_id": "asg_789",
+      "technician_id": "tech_001",
+      "site_id": "site_042",
+      "status": "arrived",
+      "accept_flag": true,
+      "decline_flag": false,
+      "offer_timestamp": "2026-03-18T13:11:00.000Z",
+      "response_timestamp": "2026-03-18T13:12:08.000Z",
+      "cancel_timestamp": null,
+      "planned_eta_timestamp": "2026-03-18T14:15:00.000Z",
+      "eta_ack_timestamp": "2026-03-18T13:20:00.000Z",
+      "eta_update_timestamp": "2026-03-18T13:55:00.000Z",
+      "route_departure_timestamp": "2026-03-18T13:25:00.000Z",
+      "scheduled_start_timestamp": "2026-03-18T14:00:00.000Z",
+      "connectivity_state": "cellular",
+      "telemetry_consent": {
+        "location": true,
+        "device": true
+      },
+      "location": {
+        "lat": 51.5074,
+        "lon": -0.1278,
+        "accuracy_m": 8.0
+      }
+    }
+  ]
+}
+
+bp = Blueprint('dispatch_event', __name__)
+
+IDEMPOTENCY_TTL_HOURS = 72
+TABLE_NAME = os.getenv('TELEMETRY_IDEMPOTENCY_TABLE', 'telemetry_idempotency')
+EVENT_HUB_NAME = os.getenv('AZURE_EVENT_HUB_NAME', 'fact_dispatch_event')
+EVENT_HUB_NAMESPACE = os.getenv('AZURE_EVENT_HUB_NAMESPACE')
+STORAGE_ACCOUNT_URL = os.getenv('AZURE_STORAGE_ACCOUNT_URL')
+
+validator = Draft202012Validator(SCHEMA)
+
+
+def _credential() -> DefaultAzureCredential:
+    return DefaultAzureCredential()
+
+
+def _table_client():
+    service = TableServiceClient(endpoint=STORAGE_ACCOUNT_URL, credential=_credential())
+    return service.get_table_client(TABLE_NAME)
+
+
+def _producer() -> EventHubProducerClient:
+    fully_qualified_namespace = f"{EVENT_HUB_NAMESPACE}.servicebus.windows.net"
+    return EventHubProducerClient(
+        fully_qualified_namespace=fully_qualified_namespace,
+        eventhub_name=EVENT_HUB_NAME,
+        credential=_credential(),
+    )
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _idempotency_lookup(event_id: str):
+    table = _table_client()
+    try:
+        return table.get_entity(partition_key='dispatch_event', row_key=event_id)
+    except Exception:
+        return None
+
+
+def _record_idempotency(event_id: str, payload: dict) -> None:
+    table = _table_client()
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=IDEMPOTENCY_TTL_HOURS)).isoformat()
+    table.upsert_entity({
+        'PartitionKey': 'dispatch_event',
+        'RowKey': event_id,
+        'created_at_utc': _utc_now(),
+        'expires_at_utc': expires_at,
+        'job_id': payload['job_id'],
+        'technician_id': payload['technician_id'],
+        'status': 'accepted',
+    })
+
+
+@bp.post('/api/v1/telemetry/dispatch-events')
+def ingest_dispatch_event():
+    token_payload = request.get_json(force=True, silent=False)
+
+    errors = sorted(validator.iter_errors(token_payload), key=lambda e: e.path)
+    if errors:
+        return jsonify({
+            'status': 'invalid',
+            'errors': [{'path': list(err.path), 'message': err.message} for err in errors],
+        }), 400
+
+    event_id = token_payload['event_id']
+    existing = _idempotency_lookup(event_id)
+    if existing:
+        return jsonify({
+            'status': 'duplicate',
+            'event_id': event_id,
+            'first_seen_at': existing.get('created_at_utc'),
+        }), 200
+
+    enriched = {
+        **token_payload,
+        'ingest_received_utc': _utc_now(),
+        'auth_subject': request.headers.get('X-Auth-Subject'),
+        'x_device_id': request.headers.get('X-Device-ID'),
+        'x_client_request_id': request.headers.get('X-Client-Request-ID'),
+        'azure_target_table': 'core.fact_dispatch_event',
+    }
+
+    producer = _producer()
+    batch = producer.create_batch()
+    batch.add(EventData(json.dumps(enriched)))
+    producer.send_batch(batch)
+
+    _record_idempotency(event_id, enriched)
+
+    return jsonify({
+        'status': 'accepted',
+        'event_id': event_id,
+        'azure_target_table': 'core.fact_dispatch_event',
+    }), 202

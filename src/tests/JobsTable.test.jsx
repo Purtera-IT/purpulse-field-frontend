@@ -1,14 +1,16 @@
 /**
+ * @vitest-environment jsdom
+ *
  * tests/JobsTable.test.jsx
  * Unit tests for the JobsTable enterprise data grid.
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import JobsTable from '../src/components/field/JobsTable';
-import { MOCK_JOBS } from '../src/lib/mockJobs';
+import JobsTable from '@/components/field/JobsTable.jsx';
+import { MOCK_JOBS } from '@/lib/mockJobs';
 
 const DEFAULT_SORT = { col: 'scheduled_date', dir: 'desc' };
 
@@ -29,6 +31,7 @@ function renderTable(overrides = {}) {
 
 describe('JobsTable', () => {
   beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(() => { cleanup(); });
 
   it('renders a table with correct ARIA role', () => {
     renderTable();
@@ -37,15 +40,17 @@ describe('JobsTable', () => {
 
   it('renders one row per job plus the header row', () => {
     renderTable();
-    const rows = screen.getAllByRole('row');
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
+    const rows = within(grid).getAllByRole('row');
     // 1 header row + 5 data rows
     expect(rows).toHaveLength(6);
   });
 
   it('displays job titles', () => {
     renderTable();
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
     MOCK_JOBS.slice(0, 5).forEach(job => {
-      expect(screen.getByText(job.title)).toBeInTheDocument();
+      expect(within(grid).getByText(job.title)).toBeInTheDocument();
     });
   });
 
@@ -84,14 +89,17 @@ describe('JobsTable', () => {
 
   it('selects a row when checkbox is clicked and shows bulk bar', () => {
     renderTable();
-    const checkboxes = screen.getAllByRole('button', { name: /^select /i });
-    fireEvent.click(checkboxes[0]);
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
+    const [, firstDataRow] = within(grid).getAllByRole('row');
+    const rowCheckbox = within(firstDataRow).getByRole('button', { name: /^select /i });
+    fireEvent.click(rowCheckbox);
     expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
   });
 
   it('select-all button selects all visible rows', () => {
     renderTable();
-    const selectAll = screen.getByRole('button', { name: /select all rows/i });
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
+    const selectAll = within(grid).getByRole('button', { name: /select all rows/i });
     fireEvent.click(selectAll);
     expect(screen.getByText(/5 selected/i)).toBeInTheDocument();
   });
@@ -99,9 +107,10 @@ describe('JobsTable', () => {
   it('calls onBulkAction when a bulk action button is clicked', () => {
     const onBulkAction = vi.fn();
     renderTable({ onBulkAction });
-    // Select first row
-    const checkboxes = screen.getAllByRole('button', { name: /^select /i });
-    fireEvent.click(checkboxes[0]);
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
+    const [, firstDataRow] = within(grid).getAllByRole('row');
+    const rowCheckbox = within(firstDataRow).getByRole('button', { name: /^select /i });
+    fireEvent.click(rowCheckbox);
     fireEvent.click(screen.getByRole('button', { name: /reassign/i }));
     expect(onBulkAction).toHaveBeenCalledWith('reassign', expect.any(Array));
   });
@@ -137,7 +146,8 @@ describe('JobsTable', () => {
 
   it('status pills have aria-label with full status text', () => {
     renderTable();
-    const pill = screen.getAllByRole('status')[0];
+    const grid = screen.getByRole('grid', { name: /jobs list/i });
+    const pill = within(grid).getAllByRole('status')[0];
     expect(pill).toHaveAttribute('aria-label', expect.stringMatching(/^Status:/));
   });
 });

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Wifi, WifiOff, Check, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { RefreshCw, WifiOff, Check, AlertTriangle } from 'lucide-react';
 
 export default function SyncIndicator() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);

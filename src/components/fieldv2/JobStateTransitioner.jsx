@@ -3,15 +3,14 @@
  * Shows current state, allowed transitions, blockers, and override capability
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { 
-  getAllowedTransitions, 
-  canTransition, 
+import {
+  canTransition,
   STATUS_LABELS,
-  STATE_MACHINE 
+  STATE_MACHINE,
 } from '@/lib/jobStateMachine';
 import {
   AlertCircle, CheckCircle2, Lock, ChevronRight,
@@ -19,6 +18,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
+import PreJobToolCheckModal from './PreJobToolCheckModal';
+import { EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
 
 function RequirementItem({ requirement, blocker }) {
   const status = blocker?.isMet ? 'met' : 'unmet';
@@ -53,31 +55,30 @@ export default function JobStateTransitioner({
   const [showOverrideReason, setShowOverrideReason] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [pendingTransition, setPendingTransition] = useState(null);
+  const [toolCheckOpen, setToolCheckOpen] = useState(false);
+  const [enRouteEtaOpen, setEnRouteEtaOpen] = useState(false);
+  const pendingAfterToolCheckRef = useRef(null);
+  const pendingEnRouteRef = useRef(null);
   const qc = useQueryClient();
 
-  if (!job || !user) return null;
-
-  const userRole = user.role || 'viewer';
-  const currentStatus = job.status;
-  const currentLabel = STATUS_LABELS[currentStatus];
-
-  // Get all allowed transitions
-  const allowedTransitions = getAllowedTransitions(
-    currentStatus,
-    userRole,
-    evidence,
-    runbookComplete,
-    hasSignature,
-  );
-
-  // Get all possible transitions (including gated ones) to show blockers
-  const allPossibleTransitions = (STATE_MACHINE[currentStatus] || []).map(t => ({
-    ...t,
-    gate: canTransition(currentStatus, t.to, userRole, evidence, runbookComplete, hasSignature),
-  }));
-
   const transitionMutation = useMutation({
-    mutationFn: async ({ toStatus, isOverride }) => {
+    mutationFn: async ({ toStatus, isOverride, dispatchOverrides }) => {
+      if (!job?.id || !user) {
+        throw new Error('Missing job or user');
+      }
+      try {
+        await emitDispatchEventForJobStatusChange({
+          job,
+          targetAppStatus: toStatus,
+          user,
+          overrides:
+            dispatchOverrides && typeof dispatchOverrides === 'object' ? dispatchOverrides : {},
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) console.error('[JobStateTransitioner] dispatch_event', e);
+        throw new Error(`Telemetry: ${msg}`);
+      }
       const payload = {
         status: toStatus,
         ...(isOverride && { override_reason: overrideReason, overridden_by: user.email }),
@@ -85,6 +86,7 @@ export default function JobStateTransitioner({
       return base44.entities.Job.update(job.id, payload);
     },
     onSuccess: (data) => {
+      if (!job?.id) return;
       qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
       qc.invalidateQueries({ queryKey: ['fj-audit', job.id] });
       toast.success(`Job transitioned to ${STATUS_LABELS[data.status]?.label}`);
@@ -98,7 +100,34 @@ export default function JobStateTransitioner({
     },
   });
 
+  if (!job || !user) return null;
+
+  const userRole = user.role || 'viewer';
+  const currentStatus = job.status;
+  const currentLabel = STATUS_LABELS[currentStatus];
+
+  // Get all possible transitions (including gated ones) to show blockers
+  const allPossibleTransitions = (STATE_MACHINE[currentStatus] || []).map(t => ({
+    ...t,
+    gate: canTransition(currentStatus, t.to, userRole, evidence, runbookComplete, hasSignature),
+  }));
+
   const handleTransition = (toStatus, isOverride = false) => {
+    if (toStatus === 'en_route' && !isOverride) {
+      pendingEnRouteRef.current = { toStatus, isOverride };
+      setEnRouteEtaOpen(true);
+      return;
+    }
+
+    const needsToolCheck =
+      toStatus === 'in_progress' && !isOverride && currentStatus !== 'paused';
+
+    if (needsToolCheck) {
+      pendingAfterToolCheckRef.current = { toStatus, isOverride };
+      setToolCheckOpen(true);
+      return;
+    }
+
     if (!isOverride && !overrideReason) {
       setPendingTransition({ toStatus, isOverride: false });
     } else if (isOverride && !overrideReason) {
@@ -109,8 +138,49 @@ export default function JobStateTransitioner({
     transitionMutation.mutate({ toStatus, isOverride });
   };
 
+  const completeToolCheckAndTransition = () => {
+    setToolCheckOpen(false);
+    const p = pendingAfterToolCheckRef.current;
+    pendingAfterToolCheckRef.current = null;
+    if (p) transitionMutation.mutate(p);
+  };
+
+  const completeEnRouteEtaAck = (ts) => {
+    setEnRouteEtaOpen(false);
+    const p = pendingEnRouteRef.current;
+    pendingEnRouteRef.current = null;
+    if (p) {
+      transitionMutation.mutate({
+        ...p,
+        dispatchOverrides: { eta_ack_timestamp: ts },
+      });
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <EtaAcknowledgementSheet
+        open={enRouteEtaOpen}
+        onOpenChange={(o) => {
+          setEnRouteEtaOpen(o);
+          if (!o) pendingEnRouteRef.current = null;
+        }}
+        jobLabel={job?.title}
+        title="Start route"
+        description="Confirm you have reviewed ETA / dispatch details before marking en route."
+        onConfirm={(ts) => completeEnRouteEtaAck(ts)}
+      />
+
+      <PreJobToolCheckModal
+        open={toolCheckOpen}
+        onOpenChange={(open) => {
+          setToolCheckOpen(open);
+          if (!open) pendingAfterToolCheckRef.current = null;
+        }}
+        job={job}
+        user={user}
+        onPassed={completeToolCheckAndTransition}
+      />
       {/* Current State */}
       <div className="px-4 py-3 border-b border-slate-50 bg-slate-50">
         <div className="flex items-center gap-3">
@@ -130,7 +200,7 @@ export default function JobStateTransitioner({
         </div>
       ) : (
         <div className="divide-y divide-slate-50">
-          {allPossibleTransitions.map(({ from, to, label, description, gate }) => {
+          {allPossibleTransitions.map(({ to, label, description, gate }) => {
             const targetLabel = STATUS_LABELS[to];
             const isAllowed = gate.isAllowed;
             const canOverride = gate.canOverride && permissions?.canEditJob;

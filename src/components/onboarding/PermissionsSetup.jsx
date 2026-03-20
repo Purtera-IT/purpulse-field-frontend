@@ -18,7 +18,7 @@
  *   - Camera denied: EvidenceCapture falls back to file picker input only (no overlay).
  */
 import React, { useState } from 'react';
-import { Camera, MapPin, CheckCircle2, XCircle, AlertTriangle, RefreshCw, ChevronRight, Info } from 'lucide-react';
+import { Camera, MapPin, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const PERMS = [

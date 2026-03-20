@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "job_context_field",
+  "description": "Canonical job_context_field snapshot for core.fact_job_context_field (Iteration 10).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "context_snapshot_timestamp",
+    "context_fingerprint",
+    "context_schema_version",
+    "job_status",
+    "evidence_requirement_count",
+    "runbook_step_count",
+    "required_field_count"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "job_context_field" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "context_snapshot_timestamp": { "type": "string", "format": "date-time" },
+    "context_fingerprint": { "type": "string", "minLength": 8, "maxLength": 128 },
+    "context_schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "runbook_version": { "type": ["string", "null"] },
+    "job_status": { "type": "string" },
+    "evidence_requirement_count": { "type": "integer", "minimum": 0 },
+    "runbook_step_count": { "type": "integer", "minimum": 0 },
+    "required_field_count": { "type": "integer", "minimum": 0 }
+  }
+}

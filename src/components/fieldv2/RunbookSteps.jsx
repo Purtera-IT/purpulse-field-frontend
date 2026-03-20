@@ -4,13 +4,14 @@
  * Shows evidence thumbnails linked to each step.
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Play, CheckCircle2, XCircle, Clock, Camera, ChevronDown, ChevronRight, FileText, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
 import EvidenceCaptureModal from './EvidenceCaptureModal';
+import { useAuth } from '@/lib/AuthContext';
+import { emitRunbookStepEvent } from '@/lib/runbookStepEvent';
 
 // ── Timer hook ─────────────────────────────────────────────────────────
 function useStepTimer(running) {
@@ -23,7 +24,8 @@ function useStepTimer(running) {
   }, [running]);
   useEffect(() => { if (!running) setSecs(0); }, [running]);
   const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const display = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return { display, elapsedSecs: secs };
 }
 
 const STEP_STATUS = {
@@ -33,13 +35,12 @@ const STEP_STATUS = {
   failed:     { label: 'Failed',    bg: 'bg-red-50',      text: 'text-red-700',     dot: 'bg-red-400'     },
 };
 
-function StepTimer({ running }) {
-  const timer = useStepTimer(running);
-  if (!running) return null;
+function StepTimer({ display }) {
+  if (!display) return null;
   return (
     <div className="flex items-center gap-1.5 text-blue-600">
       <Clock className="h-3 w-3" />
-      <span className="font-mono text-xs font-bold tabular-nums">{timer}</span>
+      <span className="font-mono text-xs font-bold tabular-nums">{display}</span>
     </div>
   );
 }
@@ -56,20 +57,77 @@ function EvidenceThumbnail({ ev }) {
   );
 }
 
-function RunbookStep({ step, jobId, evidence, adapters, onRefresh }) {
+function RunbookStep({ step, job, jobId, runbookPhaseMeta, evidence, adapters, onRefresh }) {
   const [status, setStatus]       = useState('idle');
   const [notes,  setNotes]        = useState('');
   const [open,   setOpen]         = useState(false);
   const [showCapture, setShowCapture] = useState(false);
+  const { user } = useAuth();
+  const { display: timerDisplay, elapsedSecs } = useStepTimer(status === 'in_progress');
   const stepEvidence = evidence.filter(e => e.runbook_step_id === step.id);
 
-  const handleStart = () => setStatus('in_progress');
-  const handleComplete = () => {
+  const stepPayload = {
+    id: step.id,
+    title: step.title,
+    name: step.title,
+    step_family: step.step_family ?? step.family ?? step.category,
+  };
+
+  const handleStart = async () => {
+    try {
+      await emitRunbookStepEvent({
+        job,
+        user,
+        step: stepPayload,
+        phaseMeta: runbookPhaseMeta,
+        phaseId: null,
+        stepOutcome: 'started',
+        durationMinutes: 0,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+      return;
+    }
+    setStatus('in_progress');
+  };
+
+  const handleComplete = async () => {
+    const durationMinutes = Math.max(0, Math.round(elapsedSecs / 60));
+    try {
+      await emitRunbookStepEvent({
+        job,
+        user,
+        step: stepPayload,
+        phaseMeta: runbookPhaseMeta,
+        phaseId: null,
+        stepOutcome: 'pass',
+        durationMinutes,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+      return;
+    }
     setStatus('complete');
     toast.success(`Step "${step.title}" completed`);
     onRefresh?.();
   };
-  const handleFail = () => {
+
+  const handleFail = async () => {
+    const durationMinutes = Math.max(0, Math.round(elapsedSecs / 60));
+    try {
+      await emitRunbookStepEvent({
+        job,
+        user,
+        step: stepPayload,
+        phaseMeta: runbookPhaseMeta,
+        phaseId: null,
+        stepOutcome: 'fail',
+        durationMinutes,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+      return;
+    }
     setStatus('failed');
     toast.error(`Step "${step.title}" marked failed`);
   };
@@ -89,7 +147,7 @@ function RunbookStep({ step, jobId, evidence, adapters, onRefresh }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>{cfg.label}</span>
-          <StepTimer running={status === 'in_progress'} />
+          <StepTimer display={status === 'in_progress' ? timerDisplay : null} />
           {stepEvidence.length > 0 && (
             <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
               <Camera className="h-2.5 w-2.5" />{stepEvidence.length}
@@ -173,6 +231,9 @@ export default function RunbookSteps({ job, evidence, adapters, onRefresh }) {
 
   const runbook = runbooks[0]; // In real app: match by job.runbook_id
   const steps = runbook?.steps || [];
+  const runbookPhaseMeta = {
+    sr_version: String(runbook?.version ?? job?.runbook_version ?? '0.0.0'),
+  };
 
   const completedCount = 0; // local state — real app persists per-step completion
 
@@ -198,7 +259,9 @@ export default function RunbookSteps({ job, evidence, adapters, onRefresh }) {
         <RunbookStep
           key={step.id}
           step={step}
+          job={job}
           jobId={job.id}
+          runbookPhaseMeta={runbookPhaseMeta}
           evidence={evidence}
           adapters={adapters}
           onRefresh={onRefresh}

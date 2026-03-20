@@ -12,9 +12,8 @@
  *   no_gps                   → qc_warning flag
  */
 import React from 'react';
-import {
-  CheckCircle2, AlertTriangle, Clock, RefreshCw,
-  Cpu, XCircle, Camera, EyeOff
+import { RefreshCw,
+  Cpu, Camera, EyeOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

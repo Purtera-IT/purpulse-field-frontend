@@ -1,7 +1,10 @@
 /**
+ * @vitest-environment jsdom
+ *
  * jobRepository.test.ts — Integration test for offline-first job caching
  * Tests: add → offline edit → sync path
  */
+import 'fake-indexeddb/auto'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { db, PurpulseDB } from '@/lib/db'

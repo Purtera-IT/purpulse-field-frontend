@@ -20,10 +20,14 @@ import {
 } from 'date-fns';
 import {
   Clock, Plus, ChevronLeft, ChevronRight, Lock, Unlock,
-  Loader2, ShieldCheck, MapPin, AlertTriangle,
+  Loader2, ShieldCheck, MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  emitCanonicalEventsForTimeEntry,
+  computeOpenTravelMinutesForJob,
+} from '@/lib/travelArrivalEvent';
 
 import LocationBadge from '../components/time/LocationBadge';
 import GeofenceAlerts from '../components/field/GeofenceAlerts';
@@ -33,6 +37,7 @@ import JobTimeBreakdown from '../components/time/JobTimeBreakdown';
 import ManualEntrySheet from '../components/time/ManualEntrySheet';
 import TimeTypeSelector from '../components/time/TimeTypeSelector';
 import JobSelectorModal from '../components/time/JobSelectorModal';
+import { PreArrivalAckSheet, EtaAcknowledgementSheet } from '../components/field/AcknowledgementSheets.jsx';
 import { MOCK_TIME_ENTRIES, MOCK_JOBS_FOR_TIME } from '../lib/mockTimeEntries';
 
 // ── helpers ───────────────────────────────────────────────────────────
@@ -97,6 +102,8 @@ export default function TimeLog() {
   const [gpsAccuracy,   setGpsAccuracy]   = useState(null);
   const [selectedType,  setSelectedType]  = useState(null);   // work|break|travel|off
   const [showJobPicker, setShowJobPicker] = useState(false);  // multi-job picker
+  const [pendingEtaJobId, setPendingEtaJobId] = useState(null);
+  const [pendingArrivalJobId, setPendingArrivalJobId] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -223,14 +230,58 @@ export default function TimeLog() {
     }
   };
 
-  const submitTimeEntry = (entryType, jobId) => {
+  const submitTimeEntry = async (entryType, jobId, opts = {}) => {
+    if (!jobId) {
+      toast.error('Select a job');
+      return;
+    }
+
+    if (entryType === 'travel_start' && !opts.skipEtaAckSheet) {
+      setPendingEtaJobId(jobId);
+      return;
+    }
+    if (entryType === 'travel_end' && !opts.skipScopeAckSheet) {
+      setPendingArrivalJobId(jobId);
+      return;
+    }
+
+    const ts = opts.timestampIso || new Date().toISOString();
     const entry = {
       entry_type: entryType,
       job_id: jobId,
-      timestamp: new Date().toISOString(),
+      timestamp: ts,
       source: 'app',
       sync_status: 'pending',
     };
+    const job = allJobs.find((j) => j.id === jobId) || { id: jobId };
+
+    if (['travel_start', 'travel_end', 'work_start'].includes(entryType)) {
+      const travelMinutes =
+        entryType === 'travel_end'
+          ? computeOpenTravelMinutesForJob(dayEntries, jobId, ts)
+          : null;
+      let location = null;
+      if (entryType === 'travel_start') {
+        const { getTravelStartLocationOptional } = await import('@/lib/travelGps');
+        location = await getTravelStartLocationOptional();
+      }
+      try {
+        await emitCanonicalEventsForTimeEntry({
+          job,
+          user,
+          entryType,
+          timestamp: ts,
+          travelMinutes,
+          location,
+          etaAckTimestamp: opts.etaAckTimestamp ?? null,
+          arrivalScopeAcknowledgements: opts.arrivalScopeAcknowledgements ?? null,
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Could not queue travel/arrival telemetry');
+        return;
+      }
+    }
+
     if (isMockData) {
       setLocalEntries(prev => [...prev, { ...entry, id: `local-${Date.now()}` }]);
     } else {
@@ -519,6 +570,37 @@ export default function TimeLog() {
           onCancel={() => { setShowJobPicker(false); setSelectedType(null); }}
         />
       )}
+
+      <EtaAcknowledgementSheet
+        open={pendingEtaJobId != null}
+        onOpenChange={(o) => { if (!o) setPendingEtaJobId(null); }}
+        jobLabel={allJobs.find((j) => j.id === pendingEtaJobId)?.title}
+        onConfirm={(ts) => {
+          const jid = pendingEtaJobId;
+          setPendingEtaJobId(null);
+          void submitTimeEntry('travel_start', jid, {
+            skipEtaAckSheet: true,
+            timestampIso: ts,
+            etaAckTimestamp: ts,
+          });
+        }}
+      />
+
+      <PreArrivalAckSheet
+        open={pendingArrivalJobId != null}
+        onOpenChange={(o) => { if (!o) setPendingArrivalJobId(null); }}
+        jobLabel={allJobs.find((j) => j.id === pendingArrivalJobId)?.title}
+        onConfirm={(ackState) => {
+          const jid = pendingArrivalJobId;
+          setPendingArrivalJobId(null);
+          const ts = new Date().toISOString();
+          void submitTimeEntry('travel_end', jid, {
+            skipScopeAckSheet: true,
+            timestampIso: ts,
+            arrivalScopeAcknowledgements: ackState,
+          });
+        }}
+      />
     </div>
   );
 }

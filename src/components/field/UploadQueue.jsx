@@ -8,7 +8,6 @@ import { useUploadQueue } from '@/hooks/useUploadQueue';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Pause, Play, X, AlertTriangle, CheckCircle2, Clock, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 
 const STATUS_CFG = {
   pending:        { label: 'Queued',      color: 'text-slate-500',   bg: 'bg-slate-100',    Icon: Clock },

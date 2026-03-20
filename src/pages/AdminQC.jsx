@@ -12,12 +12,13 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import {
-  CheckCircle2, AlertTriangle, XCircle, RefreshCw, Eye, EyeOff,
-  ChevronDown, ChevronUp, Filter, RotateCcw, ShieldCheck, Download
+import { RefreshCw, Eye, EyeOff,
+  ChevronDown, ChevronUp, Filter, ShieldCheck, Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { emitQcEvent, fetchJobContextForQcEvent } from '@/lib/qcEvent';
 import { QcBadge, resolveState, QC_CFG } from '../components/field/EvidenceTile';
 
 const FILTER_STATES = ['all', 'qc_ok', 'qc_warning', 'qc_failed', 'processing', 'uploaded'];
@@ -168,6 +169,7 @@ function ScoreRow({ label, value, max, warn, fail, unit, rawLabel }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function AdminQC() {
+  const { user } = useAuth();
   const [filterState, setFilterState] = useState('all');
   const [filterJob, setFilterJob]     = useState('');
   const [expandedId, setExpandedId]   = useState(null);
@@ -189,7 +191,32 @@ export default function AdminQC() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['evidence-all'] }),
   });
 
-  const handleOverride = (id, verdict, reason) => {
+  const handleOverride = async (id, verdict, reason) => {
+    const item = evidence.find((e) => e.id === id);
+    if (!item) {
+      toast.error('Evidence not found');
+      return;
+    }
+    try {
+      const job = await fetchJobContextForQcEvent(item.job_id);
+      await emitQcEvent({
+        job,
+        user,
+        evidence: item,
+        validationResult: verdict === 'passed' ? 'passed' : 'failed',
+        reviewNotes: reason,
+        defectFlag: verdict !== 'passed',
+        retestFlag: false,
+        qcTaskId: null,
+        confidence:
+          item.quality_score != null && !Number.isNaN(Number(item.quality_score))
+            ? Math.min(1, Math.max(0, Number(item.quality_score) / 100))
+            : null,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue QC event');
+      return;
+    }
     updateEvidence.mutate({ id, data: { qc_status: verdict === 'passed' ? 'passed' : 'failed', qc_fail_reasons: reason } });
     toast.success(`QC override applied: ${verdict}`);
   };

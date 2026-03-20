@@ -4,7 +4,7 @@
  * Tags as chips, voice note, auto GPS with override, face-blur toggle, "More" expander.
  */
 import React, { useState, useEffect } from 'react';
-import { MapPin, Mic, MicOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Mic, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 

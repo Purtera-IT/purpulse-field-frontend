@@ -3,7 +3,6 @@
  */
 import React from 'react';
 import { X, CheckCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 
 export default function JobSelectorModal({ jobs, onSelect, onCancel }) {

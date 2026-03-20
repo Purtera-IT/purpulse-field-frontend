@@ -11,6 +11,15 @@ import {
   CheckCircle2, XCircle, Info, RefreshCw, ChevronRight, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  PURPULSE_PERM_LOCATION_KEY,
+  PURPULSE_LOCATION_CONSENT_TS_KEY,
+} from '@/lib/locationConsent';
+
+function persistLocationConsent(value) {
+  localStorage.setItem(PURPULSE_PERM_LOCATION_KEY, value);
+  localStorage.setItem(PURPULSE_LOCATION_CONSENT_TS_KEY, new Date().toISOString());
+}
 
 const WHY_ITEMS = [
   {
@@ -93,7 +102,7 @@ export default function LocationConsentStep({ onNext, onSkip }) {
     setStatus('requesting');
     const result = await requestLocation();
     setStatus(result);
-    localStorage.setItem('purpulse_perm_location', result);
+    persistLocationConsent(result);
   };
 
   const stateCfg = STATE_CFG[status];
@@ -194,7 +203,7 @@ export default function LocationConsentStep({ onNext, onSkip }) {
 
       {/* Skip */}
       {!isDone && status !== 'requesting' && (
-        <button onClick={() => { localStorage.setItem('purpulse_perm_location', 'denied'); onNext?.(); }}
+        <button onClick={() => { persistLocationConsent('denied'); onNext?.(); }}
           className="w-full text-center text-sm text-slate-400 font-semibold py-1 active:text-slate-600">
           Skip for now — use manual check-in
         </button>

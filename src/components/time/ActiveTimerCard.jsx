@@ -3,9 +3,8 @@
  * Shows elapsed time, current state, and Start/Break/Stop CTAs.
  */
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Square, Coffee, Car, Check, MapPin } from 'lucide-react';
+import { Play, Square, Coffee, Car, Check, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { differenceInSeconds } from 'date-fns';
 
 function fmt(s) {
   const h = Math.floor(s / 3600);

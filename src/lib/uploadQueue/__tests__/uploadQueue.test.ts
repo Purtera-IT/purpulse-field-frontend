@@ -1,7 +1,10 @@
 /**
+ * @vitest-environment jsdom
+ *
  * uploadQueue.test.ts — Tests for resumable upload with chunking and backoff
- * Tests: create session, chunk file, interrupt, resume, and complete
+ * (IndexedDB via fake-indexeddb for Vitest/jsdom.)
  */
+import 'fake-indexeddb/auto'
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { uploadQueue, UploadQueueManager } from '@/lib/uploadQueue'

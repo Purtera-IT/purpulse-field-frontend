@@ -15,8 +15,8 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Zap, ZapOff, Timer, X, RotateCcw,
-  Navigation, Battery, ChevronUp, Mic
+  Zap, ZapOff, Timer, X,
+  Navigation, Battery, ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

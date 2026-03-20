@@ -6,7 +6,6 @@
  */
 import React, { useState, useRef } from 'react';
 import { X, Camera, Images, RotateCw, Upload, CheckCircle2, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { uuidv4 } from '@/lib/uuid';
 import { defaultAdapters } from '@/lib/fieldAdapters';

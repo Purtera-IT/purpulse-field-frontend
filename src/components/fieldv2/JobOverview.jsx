@@ -9,13 +9,15 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import {
   MapPin, Phone, Mail, User, Clock, Building2,
-  Play, CheckCircle, Camera, AlertTriangle, FileText,
+  Play, CheckCircle, AlertTriangle, FileText,
   Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import JobStateTransitioner from './JobStateTransitioner';
+import PreJobToolCheckModal from './PreJobToolCheckModal';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
 
 const STATUS_CFG = {
   assigned:         { label: 'Assigned',    bg: 'bg-slate-100',  text: 'text-slate-600'  },
@@ -58,7 +60,8 @@ function fmtTs(ts) { try { return format(parseISO(ts), 'MMM d, yyyy HH:mm'); } c
 
 export default function JobOverview({ job, evidence, labels, onRefresh }) {
   const [snapshotting, setSnapshotting] = useState(false);
-  const { permissions } = useAuth();
+  const [toolCheckOpen, setToolCheckOpen] = useState(false);
+  const { permissions, user } = useAuth();
   const qc = useQueryClient();
 
   // Determine if runbook is complete
@@ -71,17 +74,32 @@ export default function JobOverview({ job, evidence, labels, onRefresh }) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ status }) => {
+      await emitDispatchEventForJobStatusChange({
+        job,
+        targetAppStatus: status,
+        user,
+      });
       const now = new Date().toISOString();
       const extra = status === 'in_progress' ? { work_start_time: now, check_in_time: now } :
                     status === 'pending_closeout' ? { work_end_time: now } : {};
       return base44.entities.Job.update(job.id, { status, ...extra });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fj-job', job.id] }); onRefresh?.(); },
+    onSuccess: (_, { status }) => {
+      qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
+      onRefresh?.();
+      toast.success(`Job marked as ${status.replace(/_/g, ' ')}`);
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : 'Could not update job');
+    },
   });
 
   const handleStatusChange = (status) => {
     updateMutation.mutate({ status });
-    toast.success(`Job marked as ${status.replace(/_/g, ' ')}`);
+  };
+
+  const handleStartJobAfterToolCheck = () => {
+    handleStatusChange('in_progress');
   };
 
   const handleSnapshotSOW = async () => {
@@ -97,6 +115,13 @@ export default function JobOverview({ job, evidence, labels, onRefresh }) {
 
   return (
     <div className="space-y-3">
+      <PreJobToolCheckModal
+        open={toolCheckOpen}
+        onOpenChange={setToolCheckOpen}
+        job={job}
+        user={user}
+        onPassed={handleStartJobAfterToolCheck}
+      />
 
       {/* Status + actions */}
       <Card>
@@ -109,8 +134,14 @@ export default function JobOverview({ job, evidence, labels, onRefresh }) {
         {job.description && <p className="text-xs text-slate-600 leading-relaxed">{job.description}</p>}
         <div className="flex flex-wrap gap-2 pt-1">
           {canStart && permissions?.canCompleteJob && (
-            <button onClick={() => handleStatusChange('in_progress')} disabled={updateMutation.isPending}
-              className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            <button
+              onClick={() => {
+                if (job.status === 'paused') handleStatusChange('in_progress');
+                else setToolCheckOpen(true);
+              }}
+              disabled={updateMutation.isPending}
+              className="flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
               <Play className="h-3.5 w-3.5" /> Start Job
             </button>
           )}

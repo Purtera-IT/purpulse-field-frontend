@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, Pause, Square, Coffee, Car, Check } from 'lucide-react';
+import { Play, Square, Coffee, Car, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { telemetryTimeClockStart, telemetryTimeClockStop } from '@/lib/telemetry';
+import { useAuth } from '@/lib/AuthContext';
+import {
+  emitCanonicalEventsForTimeEntry,
+  computeOpenTravelMinutesForJob,
+} from '@/lib/travelArrivalEvent';
+import { getTravelStartLocationOptional } from '@/lib/travelGps';
+import { PreArrivalAckSheet, EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
 
 // ── helpers ──────────────────────────────────────────────────────────
 function fmt(s) {
@@ -95,11 +102,23 @@ function StopModal({ elapsed, onConfirm, onCancel, isPending }) {
 export default function TimerPanel({ jobId, statusLabel, compact = false }) {
   const [elapsed, setElapsed]       = useState(0);
   const [showStop, setShowStop]     = useState(false);
+  const [pendingEta, setPendingEta] = useState(false);
+  const [pendingArrival, setPendingArrival] = useState(false);
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
 
   const { data: entries = [] } = useQuery({
     queryKey: ['time-entries', jobId],
     queryFn: () => base44.entities.TimeEntry.filter({ job_id: jobId }, '-timestamp'),
+  });
+
+  const { data: jobRow = { id: jobId } } = useQuery({
+    queryKey: ['timer-panel-job', jobId],
+    queryFn: async () => {
+      const rows = await base44.entities.Job.filter({ id: jobId });
+      return rows?.[0] || { id: jobId };
+    },
+    enabled: Boolean(jobId),
   });
 
   const activeState = getState(entries);
@@ -113,21 +132,21 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
   }, [entries, activeState.state]);
 
   const createEntry = useMutation({
-    mutationFn: (type) => base44.entities.TimeEntry.create({
+    mutationFn: ({ type, timestamp }) => base44.entities.TimeEntry.create({
       job_id: jobId,
       entry_type: type,
-      timestamp: new Date().toISOString(),
+      timestamp,
       source: 'app',
       sync_status: 'pending',
       client_request_id: makeClientId(),
     }),
-    onMutate: (type) => {
+    onMutate: ({ type, timestamp }) => {
       // Log optimistic event — mirrors POST /api/v1/jobs/{jobId}/events
       const payload = {
         client_event_id: makeClientId(),
         event_type: type,
         job_id: jobId,
-        device_ts: new Date().toISOString(),
+        device_ts: timestamp,
         device_meta: { battery: null, gps_accuracy: null },
       };
       console.info('[Purpulse][TimerPanel] optimistic event:', JSON.stringify(payload, null, 2));
@@ -135,33 +154,71 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['time-entries', jobId] }),
   });
 
-  const fire = (type, successMsg) => {
-    // Haptic feedback per event type
+  const fireInternal = async (type, successMsg, opts = {}) => {
     if (type === 'work_start' || type === 'break_end' || type === 'travel_end') haptic('success');
     else if (type === 'break_start') haptic('warning');
     else if (type === 'travel_start') haptic('tap');
-    
-    // Track telemetry
+
+    const ts = opts.timestampIso || new Date().toISOString();
+
+    if (['travel_start', 'travel_end', 'work_start'].includes(type)) {
+      const travelMinutes =
+        type === 'travel_end'
+          ? computeOpenTravelMinutesForJob(entries, jobId, ts)
+          : null;
+      let location = null;
+      if (type === 'travel_start') {
+        location = await getTravelStartLocationOptional();
+      }
+      try {
+        await emitCanonicalEventsForTimeEntry({
+          job: jobRow,
+          user: authUser,
+          entryType: type,
+          timestamp: ts,
+          travelMinutes,
+          location,
+          etaAckTimestamp: opts.etaAckTimestamp ?? null,
+          arrivalScopeAcknowledgements: opts.arrivalScopeAcknowledgements ?? null,
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Could not queue travel/arrival telemetry');
+        return;
+      }
+    }
+
     if (type.endsWith('_start')) {
       telemetryTimeClockStart(jobId, type);
     } else if (type.endsWith('_stop') || type.endsWith('_end')) {
       telemetryTimeClockStop(jobId, type, calcWork(entries));
     }
-    
-    createEntry.mutate(type);
+
+    createEntry.mutate({ type, timestamp: ts });
     toast.success(successMsg, { duration: 2500 });
+  };
+
+  const fire = async (type, successMsg) => {
+    if (type === 'travel_start') {
+      setPendingEta(true);
+      return;
+    }
+    if (type === 'travel_end') {
+      setPendingArrival(true);
+      return;
+    }
+    return fireInternal(type, successMsg);
   };
 
   const confirmStop = () => {
     haptic('stop');
-    fire('work_stop', 'Work session ended');
+    void fire('work_stop', 'Work session ended');
     setShowStop(false);
     // Undo toast — 8s window
     toast('Work session ended', {
       duration: 8000,
       action: {
         label: 'Undo',
-        onClick: () => { fire('work_start', 'Session resumed'); },
+        onClick: () => { void fire('work_start', 'Session resumed'); },
       },
     });
   };
@@ -218,7 +275,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
 
           {activeState.state === 'working' && (
             <button
-              onClick={() => fire('break_start', 'Break started')}
+              onClick={() => void fire('break_start', 'Break started')}
               className="flex-1 h-12 rounded-md bg-white/70 text-amber-700 font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-70 border border-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
               aria-label="Start break"
             >
@@ -227,7 +284,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           )}
           {activeState.state === 'on_break' && (
             <button
-              onClick={() => fire('break_end', 'Break ended')}
+              onClick={() => void fire('break_end', 'Break ended')}
               className="flex-1 h-12 rounded-md bg-[#0E8A5F] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#0E8A5F] focus:ring-offset-2"
               aria-label="End break"
             >
@@ -236,7 +293,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           )}
           {activeState.state === 'traveling' && (
             <button
-              onClick={() => fire('travel_end', 'Arrived on site')}
+              onClick={() => void fire('travel_end', 'Arrived on site')}
               className="flex-1 h-12 rounded-md bg-[#0B66B2] text-white font-semibold text-sm flex items-center justify-center gap-1.5 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#0B66B2] focus:ring-offset-2"
               aria-label="Mark as arrived"
             >
@@ -245,7 +302,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           )}
           {activeState.state === 'idle' && (
             <button
-              onClick={() => fire('work_start', 'Work started')}
+              onClick={() => void fire('work_start', 'Work started')}
               className="w-full h-12 rounded-md bg-[#0B2D5C] text-white font-semibold text-sm flex items-center justify-center gap-2 active:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#0B2D5C] focus:ring-offset-2"
               aria-label="Start work"
             >
@@ -256,7 +313,7 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           {activeState.state === 'working' && (
             <>
               <button
-                onClick={() => fire('travel_start', 'Travel started')}
+                onClick={() => void fire('travel_start', 'Travel started')}
                 className="h-12 w-12 rounded-md bg-white/70 text-blue-600 flex items-center justify-center active:opacity-70 flex-shrink-0 border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 aria-label="Start travel"
               >
@@ -284,6 +341,32 @@ export default function TimerPanel({ jobId, statusLabel, compact = false }) {
           isPending={createEntry.isPending}
         />
       )}
+
+      <EtaAcknowledgementSheet
+        open={pendingEta}
+        onOpenChange={(o) => { if (!o) setPendingEta(false); }}
+        jobLabel={jobRow?.title}
+        onConfirm={(ts) => {
+          setPendingEta(false);
+          void fireInternal('travel_start', 'Travel started', {
+            timestampIso: ts,
+            etaAckTimestamp: ts,
+          });
+        }}
+      />
+
+      <PreArrivalAckSheet
+        open={pendingArrival}
+        onOpenChange={(o) => { if (!o) setPendingArrival(false); }}
+        jobLabel={jobRow?.title}
+        onConfirm={(ackState) => {
+          setPendingArrival(false);
+          void fireInternal('travel_end', 'Arrived on site', {
+            timestampIso: new Date().toISOString(),
+            arrivalScopeAcknowledgements: ackState,
+          });
+        }}
+      />
     </>
   );
 }

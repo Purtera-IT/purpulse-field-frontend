@@ -3,10 +3,9 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import EvidenceGallery from '../components/field/EvidenceGallery';
 import EvidenceCapture from '../components/field/EvidenceCapture';
-import { Camera, Loader2, Image as ImageIcon, Filter } from 'lucide-react';
+import { Camera, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 
 export default function EvidenceHub() {
   const [selectedJob, setSelectedJob] = useState('all');

@@ -1,13 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Circle, AlertTriangle, Loader2, Send, FileCheck } from 'lucide-react';
+import { CheckCircle2, Circle, AlertTriangle, Loader2, Send, FileCheck, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
+import { emitCloseoutEvent } from '@/lib/closeoutEvent';
+import { emitFeedbackEvent } from '@/lib/feedbackEvent';
+import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
 
 export default function CloseoutPreview({ job }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [complaintFlag, setComplaintFlag] = useState(false);
+  const [complimentFlag, setComplimentFlag] = useState(false);
+  const [feedbackNotes, setFeedbackNotes] = useState('');
+  /** Confirmed-at-closeout admin flags (optional on payload when unchecked). */
+  const [timecardSubmitted, setTimecardSubmitted] = useState(false);
+  const [invoiceSupportDocs, setInvoiceSupportDocs] = useState(false);
+  const [portalUpdated, setPortalUpdated] = useState(false);
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['evidence', job?.id],
@@ -44,16 +58,57 @@ export default function CloseoutPreview({ job }) {
   const allFieldsMet = fieldChecks.every(c => c.met);
   const canSubmit = allEvidenceMet && allFieldsMet && runbookComplete && hasSignoff;
 
+  const hasOptionalFeedback =
+    feedbackRating > 0 || complaintFlag || complimentFlag || feedbackNotes.trim().length > 0;
+
   const submitMutation = useMutation({
     mutationFn: async () => {
+      const jobCtx = await fetchJobContextForArtifactEvent(job.id);
+      const jobForEvent = { ...job, ...jobCtx };
+      const submitTs = new Date().toISOString();
+
+      await emitCloseoutEvent({
+        job: jobForEvent,
+        user,
+        documentationComplete: allEvidenceMet,
+        customerSignatureCaptured: hasSignoff,
+        runbookComplete,
+        requiredFieldsComplete: allFieldsMet,
+        closeoutSubmitTimestampIso: submitTs,
+        timecardSubmittedFlag: timecardSubmitted ? true : null,
+        invoiceSupportDocsFlag: invoiceSupportDocs ? true : null,
+        portalUpdateFlag: portalUpdated ? true : null,
+      });
+
+      if (hasOptionalFeedback) {
+        await emitFeedbackEvent({
+          job: jobForEvent,
+          user,
+          ratingValue: feedbackRating > 0 ? feedbackRating : null,
+          complaintFlag,
+          complimentFlag,
+          feedbackNotes: feedbackNotes.trim() || null,
+          feedbackSource: 'closeout',
+          feedbackTimestampIso: submitTs,
+        });
+      }
+
+      await emitDispatchEventForJobStatusChange({
+        job,
+        targetAppStatus: 'submitted',
+        user,
+      });
       await base44.entities.Job.update(job.id, {
         status: 'submitted',
-        closeout_submitted_at: new Date().toISOString(),
+        closeout_submitted_at: submitTs,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Closeout submitted successfully');
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : 'Could not submit closeout');
     },
   });
 
@@ -125,6 +180,83 @@ export default function CloseoutPreview({ job }) {
       <div>
         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Sign-Off</p>
         <CheckItem label="Client signature captured" met={hasSignoff} />
+      </div>
+
+      <div>
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Administrative (optional)</p>
+        <p className="text-[11px] text-slate-500 mb-2">
+          Check only what applies. Each checked item is sent on the canonical <code className="text-[10px]">closeout_event</code>.
+        </p>
+        <div className="rounded-xl border border-slate-100 bg-white divide-y divide-slate-50">
+          <label className="flex items-center gap-3 py-2.5 px-1 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={timecardSubmitted}
+              onChange={(e) => setTimecardSubmitted(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Timecard / hours submitted
+          </label>
+          <label className="flex items-center gap-3 py-2.5 px-1 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={invoiceSupportDocs}
+              onChange={(e) => setInvoiceSupportDocs(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Invoice support documents attached or uploaded
+          </label>
+          <label className="flex items-center gap-3 py-2.5 px-1 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={portalUpdated}
+              onChange={(e) => setPortalUpdated(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Customer / ops portal updated (status or notes)
+          </label>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-slate-500" />
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Job feedback (optional)</p>
+        </div>
+        <p className="text-[11px] text-slate-500">Rating and flags are sent as a separate canonical <code className="text-[10px]">feedback_event</code> with closeout.</p>
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 mb-1.5">Overall rating</p>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setFeedbackRating(feedbackRating === n ? 0 : n)}
+                className={cn(
+                  'h-8 w-8 rounded-lg text-xs font-black border transition-colors',
+                  feedbackRating >= n ? 'bg-amber-400 border-amber-500 text-white' : 'bg-white border-slate-200 text-slate-400'
+                )}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+          <input type="checkbox" checked={complaintFlag} onChange={(e) => setComplaintFlag(e.target.checked)} className="rounded border-slate-300" />
+          Complaint / issue to review
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+          <input type="checkbox" checked={complimentFlag} onChange={(e) => setComplimentFlag(e.target.checked)} className="rounded border-slate-300" />
+          Compliment / positive note
+        </label>
+        <textarea
+          value={feedbackNotes}
+          onChange={(e) => setFeedbackNotes(e.target.value)}
+          placeholder="Optional feedback notes…"
+          rows={2}
+          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-purple-300"
+        />
       </div>
 
       <Button

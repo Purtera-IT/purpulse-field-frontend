@@ -1,0 +1,35 @@
+# Canonical manifest validation, Iteration 13 QA, ESLint (quiet), and full Vitest suite.
+name: Field app contracts
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate canonical manifest + schemas vs allowlists
+        run: npm run validate:canonical-manifest
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Iteration 13 QA tests
+        run: npm run test:iteration13
+
+      - name: Full test suite (Vitest)
+        run: npm test

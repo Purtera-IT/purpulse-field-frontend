@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, Pause, Play, Trash2, Upload, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Pause, Trash2, Upload } from 'lucide-react'
 import { uploadQueue } from '@/lib/uploadQueue'
 import { cn } from '@/lib/utils'
 

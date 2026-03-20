@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Eye, EyeOff, RotateCcw, X, MapPin, Clock, FileText,
   CheckCircle2, AlertTriangle, XCircle, Loader2, ImageOff,
-  ChevronRight, ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';

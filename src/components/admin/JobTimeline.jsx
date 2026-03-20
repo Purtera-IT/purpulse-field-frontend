@@ -6,7 +6,7 @@ import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { RefreshCw, Camera, Tag, Clock, AlertTriangle, CheckCircle2, Mic, FileText, Upload, Play, Square, Coffee, Shield } from 'lucide-react';
+import { RefreshCw, Camera, Tag, Clock, AlertTriangle, CheckCircle2, Mic, FileText, Upload, Play, Square, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── Event config ─────────────────────────────────────────────────────

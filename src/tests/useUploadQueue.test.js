@@ -1,10 +1,8 @@
 /**
- * tests/useUploadQueue.test.js
- * Unit tests for the useUploadQueue hook module-level logic.
+ * @vitest-environment jsdom
  *
- * We test the pure state-management layer (loadFromStorage, queue mutations,
- * derived counts) by directly importing and calling the exported helpers.
- * Network calls (base44.integrations.Core.UploadFile) are mocked.
+ * useUploadQueue — queue state, persistence, metrics.
+ * Network (UploadFile / Evidence.create) is mocked; artifact_event emit is mocked.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
@@ -13,10 +11,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // ── Mocks ────────────────────────────────────────────────────────────
+vi.mock('@/lib/artifactEvent', () => ({
+  emitArtifactEventForCompletedUpload: vi.fn().mockResolvedValue('artifact-event-id'),
+  fetchJobContextForArtifactEvent: vi.fn().mockResolvedValue({ id: 'job-1' }),
+}));
+
 vi.mock('@/api/base44Client', () => ({
   base44: {
     integrations: { Core: { UploadFile: vi.fn().mockResolvedValue({ file_url: 'https://cdn.example.com/test.jpg' }) } },
-    entities: { Evidence: { create: vi.fn().mockResolvedValue({ id: 'ev-new' }) } },
+    entities: {
+      Evidence: { create: vi.fn().mockResolvedValue({ id: 'ev-new', evidence_type: 'general', captured_at: '2026-01-01T00:00:00.000Z', content_type: 'image/jpeg', size_bytes: 12 }) },
+      Job: { filter: vi.fn().mockResolvedValue([]) },
+    },
   },
 }));
 
@@ -31,13 +37,14 @@ vi.mock('@/lib/indexedFileStore', () => ({
 Object.defineProperty(navigator, 'onLine', { value: true, writable: true });
 
 // ── Import after mocks ────────────────────────────────────────────────
-import { useUploadQueue, __resetForTest__ } from '../src/hooks/useUploadQueue.js';
+import { useUploadQueue, __resetForTest__ } from '@/hooks/useUploadQueue.js';
 
 const QUEUE_KEY = 'purpulse_upload_queue_v3';
 
 function makeWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return ({ children }) =>
+    React.createElement(QueryClientProvider, { client: qc }, children);
 }
 
 function makeFile(name = 'photo.jpg') {
@@ -49,6 +56,12 @@ describe('useUploadQueue', () => {
   beforeEach(() => {
     __resetForTest__();
     localStorage.clear();
+    if (typeof URL.createObjectURL !== 'function') {
+      URL.createObjectURL = vi.fn(() => 'blob:mock');
+    }
+    if (typeof URL.revokeObjectURL !== 'function') {
+      URL.revokeObjectURL = vi.fn();
+    }
   });
 
   afterEach(() => {

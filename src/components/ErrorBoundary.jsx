@@ -4,7 +4,6 @@
  */
 import React from 'react';
 import { AlertCircle, RotateCcw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { reportError } from '@/lib/errorReporter';
 
 export default class ErrorBoundary extends React.Component {

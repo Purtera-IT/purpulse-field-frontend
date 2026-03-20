@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import QcBadge, { QC_CFG } from './QcBadge';
+import QcBadge from './QcBadge';
 import SignaturePad from './SignaturePad';
 
 // ── Type config ───────────────────────────────────────────────────────

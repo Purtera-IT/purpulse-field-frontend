@@ -15,7 +15,7 @@
  *   - Progress dots
  *   - Skip + Next controls
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Camera, Play, Square, Coffee, Car, ChevronRight, Check, Zap, ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

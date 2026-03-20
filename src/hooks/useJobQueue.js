@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
 
 const QUEUE_KEY = 'purpulse_job_event_queue';
 
@@ -30,6 +32,7 @@ export function useJobQueue() {
   const [queue, setQueue] = useState(loadQueue);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
     const onOnline  = () => { setIsOnline(true);  };
@@ -62,6 +65,7 @@ export function useJobQueue() {
     const pending = loadQueue().filter(e => e.status === 'pending');
     for (const entry of pending) {
       try {
+        // dispatch_event was already emitted in startTimer before this entry was queued
         const updates = eventTypeToJobUpdate(entry.event_type, entry.device_ts);
         await base44.entities.Job.update(entry.job_id, { ...updates, sync_status: 'synced' });
         removeFromQueue(entry.client_event_id);
@@ -99,6 +103,17 @@ export function useJobQueue() {
     const deviceTs = new Date().toISOString();
     const eventType = ['assigned', 'en_route'].includes(job.status) ? 'check_in' : 'work_start';
     const optimisticStatus = eventType === 'check_in' ? 'checked_in' : 'in_progress';
+
+    try {
+      await emitDispatchEventForJobStatusChange({
+        job,
+        targetAppStatus: optimisticStatus,
+        user: currentUser || authUser,
+      });
+    } catch (err) {
+      console.error('[useJobQueue] dispatch_event failed', err);
+      throw err;
+    }
 
     // 1. Optimistic UI — instant response, no wait
     queryClient.setQueryData(['jobs'], (old = []) =>
@@ -146,7 +161,7 @@ export function useJobQueue() {
     }
 
     return entry;
-  }, [queryClient, removeFromQueue]);
+  }, [queryClient, removeFromQueue, authUser]);
 
   const pendingCount = queue.filter(e => e.status === 'pending').length;
   const failedCount  = queue.filter(e => e.status === 'failed').length;

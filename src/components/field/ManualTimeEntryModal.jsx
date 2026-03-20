@@ -28,7 +28,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parse, isValid, isAfter, addMinutes } from 'date-fns';
-import { X, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

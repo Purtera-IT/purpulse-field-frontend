@@ -26,7 +26,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
-  RefreshCw, X, Clock, AlertTriangle, CheckCircle2,
+  RefreshCw, X, AlertTriangle, CheckCircle2,
   Loader2, Timer, Camera, MessageSquare, Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

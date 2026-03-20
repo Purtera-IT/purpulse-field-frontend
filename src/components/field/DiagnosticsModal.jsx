@@ -22,8 +22,8 @@
  *   [10:28:00] POST /api/... → 503 Service Unavailable
  *   ...
  */
-import React, { useEffect, useState, useRef } from 'react';
-import { X, Copy, Check, Wifi, WifiOff, AlertTriangle, Activity, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Copy, Check, Activity, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';

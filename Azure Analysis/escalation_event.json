@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "escalation_event",
+  "description": "Canonical escalation_event for core.fact_escalation_event (Iteration 9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "escalation_created_timestamp",
+    "reason_category",
+    "escalation_source"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "escalation_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "escalation_created_timestamp": { "type": "string", "format": "date-time" },
+    "escalation_resolved_timestamp": { "type": ["string", "null"] },
+    "reason_category": { "type": "string" },
+    "escalation_source": {
+      "type": "string",
+      "enum": ["blocker_create", "pm_chat", "runbook_escalation"]
+    },
+    "severity": { "type": ["string", "null"] },
+    "escalation_record_id": { "type": ["string", "null"] },
+    "notes_preview": { "type": ["string", "null"] }
+  }
+}

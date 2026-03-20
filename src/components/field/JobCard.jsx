@@ -1,10 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { StatusBadge, PriorityIndicator, SyncBadge } from './StatusBadge';
 import { MapPin, Clock, User, ChevronRight, Play, Navigation, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+const JobSiteMapLazy = lazy(() => import('@/components/field/JobSiteMap'));
 
 const SWIPE_REVEAL  = 60;   // px — reveal action zone
 const SWIPE_COMMIT  = 110;  // px — auto-commit action on release
@@ -13,7 +21,12 @@ export default function JobCard({ job, onStartTimer, isStarting }) {
   const navigate = useNavigate();
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const touchStart = useRef({ x: 0, y: 0 });
+
+  const canShowSiteMap =
+    Boolean(job.site_address) ||
+    (job.site_lat != null && job.site_lon != null);
 
   // ── touch handlers ────────────────────────────────────────────────
   const handleTouchStart = (e) => {
@@ -171,10 +184,31 @@ export default function JobCard({ job, onStartTimer, isStarting }) {
 
         {/* Meta rows */}
         <div className="space-y-1.5 mb-3">
-          {job.site_address && (
+          {(job.site_address || canShowSiteMap) && (
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <MapPin className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <span className="truncate">{job.site_address}</span>
+              {job.site_address ? (
+                <span className="truncate flex-1 min-w-0">{job.site_address}</span>
+              ) : (
+                <span className="truncate flex-1 min-w-0 text-slate-400 italic">Site coordinates on file</span>
+              )}
+              {canShowSiteMap && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMapOpen(true);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                  }}
+                  className="flex-shrink-0 text-[10px] font-bold uppercase text-blue-600 px-2 py-1 rounded-lg bg-blue-50 active:opacity-70"
+                  aria-label={`Open site map for ${job.title}`}
+                >
+                  Map
+                </button>
+              )}
             </div>
           )}
           {job.scheduled_date && (
@@ -234,6 +268,31 @@ export default function JobCard({ job, onStartTimer, isStarting }) {
           </div>
         )}
       </div>
+
+      {canShowSiteMap && (
+        <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+          <DialogContent
+            className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg p-0 gap-0 overflow-hidden [&_.leaflet-container]:!z-0"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <DialogHeader className="px-4 pt-4 pb-2 text-left">
+              <DialogTitle className="text-base">Site location</DialogTitle>
+            </DialogHeader>
+            <div className="px-4 pb-4">
+              <Suspense
+                fallback={
+                  <div className="h-[220px] flex items-center justify-center bg-slate-100 text-sm text-slate-500 rounded-xl border border-slate-200">
+                    Loading map…
+                  </div>
+                }
+              >
+                <JobSiteMapLazy job={job} height={240} dense scrollWheelZoom={false} />
+              </Suspense>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

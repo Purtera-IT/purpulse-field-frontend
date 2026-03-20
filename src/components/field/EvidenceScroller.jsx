@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Camera } from 'lucide-react';
 import EvidenceTile from './EvidenceTile';
 import EvidenceDetailSheet from './EvidenceDetailSheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';

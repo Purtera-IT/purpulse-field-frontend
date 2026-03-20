@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tool_check_event",
+  "description": "Canonical tool_check_event for core.fact_tool_check_event (Iteration 10 — pre-job readiness checklist).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "tool_check_timestamp",
+    "all_items_passed_flag",
+    "ppe_compliant_flag",
+    "essential_tools_ready_flag",
+    "bom_docs_reviewed_flag",
+    "site_safety_ack_flag"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "tool_check_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "tool_check_timestamp": { "type": "string", "format": "date-time" },
+    "all_items_passed_flag": { "type": "boolean" },
+    "ppe_compliant_flag": { "type": "boolean" },
+    "essential_tools_ready_flag": { "type": "boolean" },
+    "bom_docs_reviewed_flag": { "type": "boolean" },
+    "site_safety_ack_flag": { "type": "boolean" },
+    "required_docs_opened_flag": { "type": ["boolean", "null"] },
+    "risk_flag_ack_flag": { "type": ["boolean", "null"] },
+    "customer_notes_review_flag": { "type": ["boolean", "null"] },
+    "site_constraint_ack_flag": { "type": ["boolean", "null"] },
+    "step_sequence_preview_flag": { "type": ["boolean", "null"] }
+  }
+}

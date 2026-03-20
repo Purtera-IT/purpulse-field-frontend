@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "artifact_event",
+  "description": "Canonical artifact_event for core.fact_artifact_event (Iteration 7). Emitted when an evidence row is successfully created after upload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "artifact_id",
+    "evidence_type",
+    "captured_at",
+    "asset_tag_capture_flag",
+    "customer_signature_flag"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "artifact_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "artifact_id": { "type": "string" },
+    "documentation_artifact_id": { "type": ["string", "null"] },
+    "evidence_type": { "type": "string" },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "content_type": { "type": ["string", "null"] },
+    "size_bytes": { "type": ["number", "null"] },
+    "runbook_step_id": { "type": ["string", "null"] },
+    "serial_value": { "type": ["string", "null"] },
+    "asset_tag_capture_flag": { "type": "boolean" },
+    "customer_signature_flag": { "type": "boolean" },
+    "photo_uploaded_count": { "type": ["number", "null"] },
+    "photo_required_count": { "type": ["number", "null"] }
+  }
+}

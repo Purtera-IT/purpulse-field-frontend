@@ -2,9 +2,8 @@ import React from 'react';
 import { StatusBadge, PriorityIndicator } from './StatusBadge';
 import CheckInFlow from './CheckInFlow';
 import TimeTracker from './TimeTracker';
-import { MapPin, Phone, Mail, User, Building2, Calendar, ExternalLink } from 'lucide-react';
+import { MapPin, Phone, Mail, User, Building2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
 
 export default function JobOverviewTab({ job }) {
   const isActive = ['checked_in', 'in_progress', 'paused'].includes(job.status);

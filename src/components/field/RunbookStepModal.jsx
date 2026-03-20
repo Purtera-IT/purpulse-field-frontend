@@ -9,15 +9,14 @@
  *   5. On evidence missing + user force-passes → override modal (reason required, audit logged)
  *   6. Safety steps → open SafetyChecklistModal before allowing pass
  */
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
   X, CheckCircle2, XCircle, Camera, Lock, AlertTriangle,
-  ShieldCheck, ChevronRight, RotateCcw, FileText, Wrench
+  ShieldCheck, RotateCcw, FileText, Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 import EvidenceCapture from './EvidenceCapture';
 import SafetyChecklistModal from './SafetyChecklistModal';
 

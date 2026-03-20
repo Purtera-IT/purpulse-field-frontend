@@ -3,7 +3,7 @@
  * Used on photo and signature deliverables.
  */
 import React from 'react';
-import { CheckCircle2, AlertTriangle, XCircle, Upload, MapPin, Wifi } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Upload, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const QC_CFG = {

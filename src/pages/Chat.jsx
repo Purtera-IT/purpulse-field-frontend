@@ -7,12 +7,9 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, MessageCircle, ChevronRight } from 'lucide-react';
+import { Sparkles, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
-import { MOCK_JOBS } from '../lib/mockJobs';
 import { MOCK_ACTIVE_JOB } from '../lib/mockChatData';
-import { STATUS_CFG } from '../components/field/JobRichCard';
 
 import JobContextHeader from '../components/chat/JobContextHeader';
 import AIChatView from '../components/chat/AIChatView';

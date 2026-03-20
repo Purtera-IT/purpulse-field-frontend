@@ -22,7 +22,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parse, isValid, isBefore } from 'date-fns';
-import { Lock, ShieldCheck, X, Clock, Pencil, AlertTriangle, Send } from 'lucide-react';
+import { Lock, ShieldCheck, X, Pencil, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

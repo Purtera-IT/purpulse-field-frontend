@@ -10,7 +10,7 @@
  * Dismissable per session. Shows CTA relevant to each alert.
  */
 import React, { useState } from 'react';
-import { AlertTriangle, MapPin, ShieldOff, Navigation, X, ChevronRight, RefreshCw } from 'lucide-react';
+import { AlertTriangle, MapPin, ShieldOff, Navigation, X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

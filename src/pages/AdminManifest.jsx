@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import JobTimeline from '../components/admin/JobTimeline';
 import { cn } from '@/lib/utils';
-import { rowsToCSV, downloadCSV } from '@/lib/mockManifest';
+import { downloadCSV } from '@/lib/mockManifest';
 import { seedMockData } from '@/lib/mockSeedData';
 import { format, parseISO } from 'date-fns';
 import AdminShell from '../components/admin/AdminShell';

@@ -5,13 +5,13 @@
  */
 import React from 'react';
 import {
-  MapPin, Navigation, Phone, Mail, Clock, User, Building2,
-  ShieldAlert, KeyRound, Cloud, RefreshCw, CloudOff, Zap,
-  AlertTriangle, CheckCircle2, Package, ClipboardList,
+  MapPin, Phone, Mail, Clock, User, Building2,
+  ShieldAlert, KeyRound, Cloud, RefreshCw, CloudOff, CheckCircle2, Package, ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 import { PRIORITY_CFG, STATUS_CFG } from './JobRichCard';
+import JobSiteMap from './JobSiteMap';
 
 const SYNC_CFG = {
   synced:  { Icon: Cloud,     cls: 'text-emerald-500', label: 'Synced'      },
@@ -154,23 +154,22 @@ export default function JobDetailOverview({ job, onNavigateToTasks, dense = fals
       <SectionCard title="Site & Location" dense={dense}>
         {job.site_name    && <InfoRow icon={Building2} label="Site"    dense={dense}>{job.site_name}</InfoRow>}
         {job.site_address && (
-          <div className="flex items-start gap-2">
-            <div className={cn('rounded-[6px] bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5', dense ? 'h-6 w-6' : 'h-8 w-8')}>
-              <MapPin className={cn(dense ? 'h-3 w-3' : 'h-4 w-4', 'text-slate-400')} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-px">Address</p>
-              <p className={cn('text-slate-700 font-semibold leading-snug', dense ? 'text-xs' : 'text-sm')}>{job.site_address}</p>
-            </div>
-            <a
-              href={`https://maps.google.com/maps?q=${encodeURIComponent(job.site_address)}`}
-              target="_blank" rel="noopener noreferrer"
-              className={cn('flex items-center gap-1 rounded-[8px] bg-blue-600 text-white font-bold flex-shrink-0 active:opacity-80', dense ? 'h-7 px-2 text-[10px]' : 'h-9 px-3 text-xs')}
-            >
-              <Navigation className={cn(dense ? 'h-3 w-3' : 'h-3.5 w-3.5')} /> Nav
-            </a>
-          </div>
+          <InfoRow icon={MapPin} label="Address" dense={dense}>
+            <p className={cn('text-slate-700 font-semibold leading-snug', dense ? 'text-xs' : 'text-sm')}>{job.site_address}</p>
+          </InfoRow>
         )}
+        <div className="pt-1">
+          <p className={cn('text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2', dense && 'mb-1.5')}>
+            Site map
+          </p>
+          <JobSiteMap
+            job={job}
+            height={dense ? 160 : 220}
+            dense={dense}
+            scrollWheelZoom={false}
+            className="[&_.leaflet-container]:!z-0"
+          />
+        </div>
         {job.access_instructions && (
           <InfoRow icon={KeyRound} label="Access" iconCls="text-amber-500" dense={dense}>
             <p className={cn('text-slate-600 font-normal leading-relaxed', dense ? 'text-[11px]' : 'text-sm')}>{job.access_instructions}</p>

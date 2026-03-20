@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, AlertTriangle, PenTool, FileCheck } from 'lucide-react';
+import { Save, Loader2, PenTool } from 'lucide-react';
 import { toast } from 'sonner';
 import SignoffCapture from './SignoffCapture';
 import CloseoutPreview from './CloseoutPreview';

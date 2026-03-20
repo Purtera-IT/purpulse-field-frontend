@@ -6,8 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   User, LogOut, Smartphone, Shield, Bell, MapPin, Camera,
-  ChevronRight, ShieldCheck, AlertTriangle, XCircle, Star,
-  Clock, Briefcase, TrendingUp, Info, Eye, Link as LinkIcon,
+  ChevronRight, ShieldCheck, AlertTriangle, XCircle, Info, Eye,
   SlidersHorizontal, Palette,
 } from 'lucide-react';
 import DensityToggle from '../components/ui/DensityToggle';
@@ -19,6 +18,7 @@ import { toast } from 'sonner';
 import { MOCK_PROFILE } from '@/lib/mockData';
 import { MOCK_JOBS } from '@/lib/mockJobs';
 import { format } from 'date-fns';
+import TelemetryIngestDebugPanel, { showTelemetryIngestDebug } from '@/components/dev/TelemetryIngestDebugPanel';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function SectionCard({ title, children }) {
@@ -260,6 +260,11 @@ export default function Profile() {
           <SettingRow icon={Bell} label="Push Notifications" sub="Job assignments, messages, sync alerts" toggle={notifPush}  onToggle={() => setNotifPush(v => !v)} />
           <SettingRow icon={User} label="Email Digests"      sub="Daily job summary to your email"        toggle={notifEmail} onToggle={() => setNotifEmail(v => !v)} />
         </SectionCard>
+
+        {/* ── Dev: canonical telemetry queue (Iteration 1 spine) ── */}
+        {showTelemetryIngestDebug() && (
+          <TelemetryIngestDebugPanel />
+        )}
 
         {/* ── Device & Session ─────────────────────────── */}
         <SectionCard title="Device & Session">

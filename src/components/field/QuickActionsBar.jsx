@@ -2,9 +2,11 @@ import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Camera, Paperclip, StickyNote, ShieldCheck, MoreHorizontal, RefreshCw, AlertTriangle, UserX } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
+import { emitArtifactEventForCompletedUpload } from '@/lib/artifactEvent';
 import EvidenceCapture from './EvidenceCapture';
 import BlockerForm from './BlockerForm';
 import SafetyChecklistModal from './SafetyChecklistModal';
@@ -35,13 +37,14 @@ export default function QuickActionsBar({ job }) {
   const [sheet, setSheet] = useState(null); // 'photo' | 'note' | 'safety' | 'overflow' | 'blocker' | 'status'
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const handleFileAttach = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.entities.Evidence.create({
+      const record = await base44.entities.Evidence.create({
         job_id: job.id,
         evidence_type: 'attachment',
         file_url,
@@ -50,12 +53,33 @@ export default function QuickActionsBar({ job }) {
         captured_at: new Date().toISOString(),
         status: 'uploaded',
       });
+      try {
+        await emitArtifactEventForCompletedUpload({
+          job: { id: job.id, project_id: job.project_id, site_id: job.site_id },
+          user,
+          evidence: record,
+          metadata: {},
+          photoUploadedCount: 1,
+        });
+      } catch (e) {
+        console.warn('[artifact_event] enqueue failed (quick attach)', e);
+      }
       queryClient.invalidateQueries({ queryKey: ['evidence', job.id] });
       toast.success('File attached');
     } catch { toast.error('Upload failed'); }
   };
 
   const handleStatusChange = async (newStatus) => {
+    try {
+      await emitDispatchEventForJobStatusChange({
+        job,
+        targetAppStatus: newStatus,
+        user,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not record dispatch event');
+      return;
+    }
     await base44.entities.Job.update(job.id, { status: newStatus });
     queryClient.invalidateQueries({ queryKey: ['jobs'] });
     queryClient.invalidateQueries({ queryKey: ['job', job.id] });

@@ -4,11 +4,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Send, Phone, AlertOctagon, Paperclip, ClipboardList,
-  Camera, StickyNote, X, CheckCircle2, ChevronDown,
+  Camera, StickyNote, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { MOCK_PM_MESSAGES } from '../../lib/mockChatData';
+import { useAuth } from '@/lib/AuthContext';
+import { emitEscalationEvent } from '@/lib/escalationEvent';
+import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
 
 // ── Message bubble ────────────────────────────────────────────────
 function PMBubble({ msg }) {
@@ -137,6 +140,7 @@ function AttachSheet({ onAttach, onClose }) {
 
 // ── Main component ────────────────────────────────────────────────
 export default function PMChatView({ job, pm }) {
+  const { user } = useAuth();
   const [messages,     setMessages]     = useState(MOCK_PM_MESSAGES);
   const [draft,        setDraft]        = useState('');
   const [showEscalate, setShowEscalate] = useState(false);
@@ -168,11 +172,24 @@ export default function PMChatView({ job, pm }) {
     setShowActions(false);
   };
 
-  const handleEscalate = (type, note) => {
+  const handleEscalate = async (type, note) => {
     pushMsg({
       type: 'escalation',
       content: `[${type.replace(/_/g, ' ').toUpperCase()}] ${note}`,
     });
+    if (!job?.id) return;
+    try {
+      const jobCtx = await fetchJobContextForArtifactEvent(job.id);
+      await emitEscalationEvent({
+        job: { id: job.id, ...jobCtx },
+        user,
+        reasonCategory: type,
+        escalationSource: 'pm_chat',
+        notesPreview: note,
+      });
+    } catch (err) {
+      console.warn('[escalation_event] enqueue failed (PM chat)', err);
+    }
   };
 
   return (

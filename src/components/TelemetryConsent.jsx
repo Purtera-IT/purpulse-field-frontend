@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Eye, Lock } from 'lucide-react';
+import { X, Lock } from 'lucide-react';
 import { setTelemetryConsent, isTelemetryEnabled } from '@/lib/telemetry';
 
 const CONSENT_SHOWN_KEY = 'purpulse_telemetry_consent_shown';

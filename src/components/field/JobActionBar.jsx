@@ -283,7 +283,7 @@ export default function JobActionBar({ job, onOpenChat, isReadOnly }) {
           <div className="pt-3 px-4">
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
             <h3 className="text-base font-black text-red-700 mb-4">Report Blocker</h3>
-            <BlockerForm jobId={job.id} onSubmitted={() => { setSheet(null); toast.success('Blocker reported'); }} />
+            <BlockerForm jobId={job.id} onClose={() => setSheet(null)} />
           </div>
         </SheetContent>
       </Sheet>

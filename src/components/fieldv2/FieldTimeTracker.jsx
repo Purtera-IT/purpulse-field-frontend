@@ -11,6 +11,9 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { uuidv4 } from '@/lib/uuid';
 import { defaultAdapters } from '@/lib/fieldAdapters';
+import { useAuth } from '@/lib/AuthContext';
+import { emitArrivalForClockIn } from '@/lib/travelArrivalEvent';
+import { PreArrivalAckSheet } from '@/components/field/AcknowledgementSheets.jsx';
 
 const EVENT_TYPES = ['clock_in','clock_out','start_step','end_step','upload','label','note_added'];
 const EVENT_ICON = {
@@ -36,8 +39,10 @@ function ActivityRow({ a }) {
 
 export default function FieldTimeTracker({ job, activities, adapters, onRefresh }) {
   const adapter = adapters?.activity || defaultAdapters.activity;
+  const { user } = useAuth();
   const [clocked,   setClockedIn]  = useState(() => activities.some(a => a.event_type === 'clock_in'));
   const [showManual,setShowManual] = useState(false);
+  const [arrivalAckOpen, setArrivalAckOpen] = useState(false);
   const [manualType,setManualType] = useState('note_added');
   const [manualNote,setManualNote] = useState('');
   const [manualTs,  setManualTs]   = useState('');
@@ -48,13 +53,20 @@ export default function FieldTimeTracker({ job, activities, adapters, onRefresh 
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['fj-activities', job.id] }); onRefresh?.(); },
   });
 
-  const handleClockIn = () => {
+  const performClockIn = async (arrivalScopeAcknowledgements) => {
+    const ts = new Date().toISOString();
+    try {
+      await emitArrivalForClockIn({ job, user, timestamp: ts, arrivalScopeAcknowledgements });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not queue arrival telemetry');
+      return;
+    }
     log.mutate({
       id:              uuidv4(),
       event_type:      'clock_in',
       user_id:         'admin@purpulse.com',
       work_order_id:   job.id,
-      timestamp:       new Date().toISOString(),
+      timestamp:       ts,
       meta:            { device_id: 'device-web', app_version: '2.4.1' },
     });
     setClockedIn(true);
@@ -93,6 +105,14 @@ export default function FieldTimeTracker({ job, activities, adapters, onRefresh 
 
   return (
     <div className="space-y-4">
+      <PreArrivalAckSheet
+        open={arrivalAckOpen}
+        onOpenChange={setArrivalAckOpen}
+        jobLabel={job?.title}
+        onConfirm={(ackState) => {
+          void performClockIn(ackState);
+        }}
+      />
 
       {/* Clock in/out */}
       <div className="bg-white rounded-xl border border-slate-100 p-4">
@@ -103,7 +123,7 @@ export default function FieldTimeTracker({ job, activities, adapters, onRefresh 
           </span>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleClockIn} disabled={clocked || log.isPending}
+          <button onClick={() => setArrivalAckOpen(true)} disabled={clocked || log.isPending}
             className="flex-1 h-11 rounded-[8px] bg-emerald-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-emerald-700 transition-colors">
             <Play className="h-4 w-4" /> Clock In
           </button>

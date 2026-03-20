@@ -8,8 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Loader2, PenTool, RotateCcw, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
+import { emitFeedbackEvent } from '@/lib/feedbackEvent';
 
 export default function SignoffCapture({ job, onComplete }) {
+  const { user } = useAuth();
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -84,8 +87,22 @@ export default function SignoffCapture({ job, onComplete }) {
         signoff_csat: csat,
         signoff_notes: notes,
       });
+      return { csatSnapshot: csat, notesSnapshot: notes };
     },
-    onSuccess: () => {
+    onSuccess: async ({ csatSnapshot, notesSnapshot }) => {
+      try {
+        await emitFeedbackEvent({
+          job,
+          user,
+          ratingValue: csatSnapshot > 0 ? csatSnapshot : null,
+          complaintFlag: csatSnapshot > 0 && csatSnapshot <= 2,
+          complimentFlag: csatSnapshot >= 4,
+          feedbackNotes: notesSnapshot?.trim() || null,
+          feedbackSource: 'signoff',
+        });
+      } catch (err) {
+        console.warn('[feedback_event] enqueue failed after signoff', err);
+      }
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Sign-off captured');
       onComplete?.();

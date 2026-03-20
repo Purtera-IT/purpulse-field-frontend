@@ -75,6 +75,10 @@ export class PurpulseDB extends Dexie {
       editQueue: '++id, jobId, syncStatus, timestamp',
       uploadQueue: '++id, jobId, syncStatus, timestamp',
     })
+    // evidenceId index required for db.uploadQueue.where('evidenceId') (upload completion sync)
+    this.version(2).stores({
+      uploadQueue: '++id, jobId, evidenceId, syncStatus, timestamp',
+    })
   }
 }
 

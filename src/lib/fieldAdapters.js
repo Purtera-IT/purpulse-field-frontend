@@ -5,6 +5,17 @@
  */
 import { base44 } from '@/api/base44Client';
 import {
+  emitArtifactEventForCompletedUpload,
+  fetchJobContextForArtifactEvent,
+} from '@/lib/artifactEvent';
+import {
+  emitQcEvent,
+  fetchJobContextForQcEvent,
+  mapLabelTypeToValidationResult,
+  defectFlagForLabelType,
+  parseBboxForQcEvent,
+} from '@/lib/qcEvent';
+import {
   validateJob,
   validateJobs,
   validateEvidence,
@@ -153,6 +164,26 @@ export class Base44UploadAdapter {
         duration_ms: Date.now() - start,
       });
 
+      try {
+        const job = await fetchJobContextForArtifactEvent(evidenceData.job_id);
+        const user = actorEmail ? { email: actorEmail } : null;
+        await emitArtifactEventForCompletedUpload({
+          job,
+          user,
+          evidence: record,
+          metadata: {
+            serial_number: evidenceData.serial_number,
+            runbook_step_id: evidenceData.runbook_step_id,
+            lat: evidenceData.geo_lat,
+            lon: evidenceData.geo_lon,
+            capture_ts: evidenceData.captured_at,
+          },
+          photoUploadedCount: 1,
+        });
+      } catch (e) {
+        console.warn('[artifact_event] enqueue failed (adapter upload)', e);
+      }
+
       return validated.success ? validated.data : record;
     } catch (err) {
       console.error('[Upload] completeUpload failed:', err);
@@ -203,6 +234,35 @@ export class Base44LabelAdapter {
           evidence_id: data.evidence_id,
         },
       });
+
+      try {
+        const job = await fetchJobContextForQcEvent(data.job_id);
+        const validationResult = mapLabelTypeToValidationResult(data.label_type);
+        const user = actorEmail ? { email: actorEmail } : null;
+        await emitQcEvent({
+          job,
+          user,
+          evidence: {
+            id: data.evidence_id,
+            job_id: data.job_id,
+            runbook_step_id: data.runbook_step_id,
+          },
+          validationResult,
+          reviewNotes: data.notes != null ? String(data.notes) : null,
+          qcTaskId: record.id || null,
+          confidence: data.confidence != null ? Number(data.confidence) : null,
+          bbox: parseBboxForQcEvent(data.bbox),
+          approvedForTraining:
+            data.approved_for_training === true || data.approved_for_training === false
+              ? data.approved_for_training
+              : null,
+          defectFlag: defectFlagForLabelType(data.label_type, validationResult),
+          retestFlag: false,
+          reviewTimestampIso: data.labeled_at || undefined,
+        });
+      } catch (err) {
+        console.warn('[qc_event] enqueue failed after LabelRecord.create', err);
+      }
 
       return validated.success ? validated.data : record;
     } catch (err) {

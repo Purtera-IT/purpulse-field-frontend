@@ -1,0 +1,156 @@
+{
+  "manifest_version": "1.0.0",
+  "repo": "purpulse-fieldapp",
+  "description": "Loader-oriented index: JSON Schema + field-app emitters aligned to core.fact_* (Iteration 12).",
+  "techpulse_refs": {
+    "database_master_doc": "TechPulse_Full_Lineage_Atlas_Package/TechPulse_Azure_Database_Master_Documentation.md",
+    "model_catalog_csv": "TechPulse_Full_Lineage_Atlas_Package/TechPulse_Azure_Model_Catalog.csv",
+    "datapoint_catalog_csv": "TechPulse_Full_Lineage_Atlas_Package/TechPulse_Azure_DataPoint_Catalog.csv"
+  },
+  "ingestion_pipeline": {
+    "telemetry_queue": {
+      "path": "src/lib/telemetryQueue.js",
+      "export": "enqueueCanonicalEvent"
+    },
+    "telemetry_http": {
+      "path": "src/api/telemetryIngestion.js",
+      "export": "sendCanonicalEnvelope"
+    },
+    "telemetry_envelope": {
+      "path": "src/lib/telemetryEnvelope.js",
+      "exports": ["buildCanonicalEnvelope", "CANONICAL_SCHEMA_VERSION"]
+    }
+  },
+  "ingestion_contract": {
+    "idempotency_key": "event_id",
+    "envelope_required": [
+      "event_id",
+      "schema_version",
+      "event_name",
+      "event_ts_utc",
+      "client_ts",
+      "source_system",
+      "job_id",
+      "technician_id"
+    ],
+    "source_system_const": "field_app",
+    "notes": "Server adds ingest_received_utc, batch_id, and loader version; strip unknown keys only after schema validation (field app already allowlists per family)."
+  },
+  "families": [
+    {
+      "event_name": "dispatch_event",
+      "fact_table": "core.fact_dispatch_event",
+      "json_schema": "Azure Analysis/dispatch_event.json",
+      "lib": "src/lib/dispatchEvent.js",
+      "allowlist_export": "DISPATCH_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertDispatchEventRequired",
+      "primary_emit_export": "emitDispatchEventForJobStatusChange"
+    },
+    {
+      "event_name": "travel_event",
+      "fact_table": "core.fact_travel_event",
+      "json_schema": "Azure Analysis/travel_event.json",
+      "lib": "src/lib/travelArrivalEvent.js",
+      "allowlist_export": "TRAVEL_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertTravelEventRequired",
+      "primary_emit_export": "emitCanonicalEventsForTimeEntry",
+      "additional_emit_exports": ["emitArrivalForClockIn"]
+    },
+    {
+      "event_name": "arrival_event",
+      "fact_table": "core.fact_arrival_event",
+      "json_schema": "Azure Analysis/arrival_event.json",
+      "lib": "src/lib/travelArrivalEvent.js",
+      "allowlist_export": "ARRIVAL_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertArrivalEventRequired",
+      "primary_emit_export": "emitArrivalForClockIn",
+      "additional_emit_exports": ["emitCanonicalEventsForTimeEntry"]
+    },
+    {
+      "event_name": "runbook_step_event",
+      "fact_table": "core.fact_runbook_step_event",
+      "json_schema": "Azure Analysis/runbook_step_event.json",
+      "lib": "src/lib/runbookStepEvent.js",
+      "allowlist_export": "RUNBOOK_STEP_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertRunbookStepEventRequired",
+      "primary_emit_export": "emitRunbookStepEvent"
+    },
+    {
+      "event_name": "artifact_event",
+      "fact_table": "core.fact_artifact_event",
+      "json_schema": "Azure Analysis/artifact_event.json",
+      "lib": "src/lib/artifactEvent.js",
+      "allowlist_export": "ARTIFACT_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertArtifactEventRequired",
+      "primary_emit_export": "emitArtifactEventForCompletedUpload"
+    },
+    {
+      "event_name": "qc_event",
+      "fact_table": "core.fact_qc_event",
+      "json_schema": "Azure Analysis/qc_event.json",
+      "lib": "src/lib/qcEvent.js",
+      "allowlist_export": "QC_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertQcEventRequired",
+      "primary_emit_export": "emitQcEvent"
+    },
+    {
+      "event_name": "closeout_event",
+      "fact_table": "core.fact_closeout_event",
+      "json_schema": "Azure Analysis/closeout_event.json",
+      "lib": "src/lib/closeoutEvent.js",
+      "allowlist_export": "CLOSEOUT_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertCloseoutEventRequired",
+      "primary_emit_export": "emitCloseoutEvent"
+    },
+    {
+      "event_name": "escalation_event",
+      "fact_table": "core.fact_escalation_event",
+      "json_schema": "Azure Analysis/escalation_event.json",
+      "lib": "src/lib/escalationEvent.js",
+      "allowlist_export": "ESCALATION_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertEscalationEventRequired",
+      "primary_emit_export": "emitEscalationEvent"
+    },
+    {
+      "event_name": "feedback_event",
+      "fact_table": "core.fact_feedback_event",
+      "json_schema": "Azure Analysis/feedback_event.json",
+      "lib": "src/lib/feedbackEvent.js",
+      "allowlist_export": "FEEDBACK_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertFeedbackEventRequired",
+      "primary_emit_export": "emitFeedbackEvent"
+    },
+    {
+      "event_name": "tool_check_event",
+      "fact_table": "core.fact_tool_check_event",
+      "json_schema": "Azure Analysis/tool_check_event.json",
+      "lib": "src/lib/toolCheckEvent.js",
+      "allowlist_export": "TOOL_CHECK_EVENT_PROPERTY_KEYS",
+      "assert_export": "assertToolCheckEventRequired",
+      "primary_emit_export": "emitToolCheckEvent"
+    },
+    {
+      "event_name": "job_context_field",
+      "fact_table": "core.fact_job_context_field",
+      "json_schema": "Azure Analysis/job_context_field.json",
+      "lib": "src/lib/jobContextField.js",
+      "allowlist_export": "JOB_CONTEXT_FIELD_PROPERTY_KEYS",
+      "assert_export": "assertJobContextFieldRequired",
+      "primary_emit_export": "emitJobContextFieldIfChanged"
+    }
+  ],
+  "deferred_field_app": [
+    {
+      "event_name": "domain_tool_log",
+      "fact_table": "core.fact_domain_tool_log",
+      "status": "no_json_schema_in_repo",
+      "notes": "Listed in TechPulse_Azure_Database_Master_Documentation §3; field-app emitter not implemented (Iteration 10 scope excluded domain_tool_log)."
+    }
+  ],
+  "non_silver_dev_helpers": [
+    {
+      "event_name": "ping_event",
+      "notes": "Dev/health envelope via src/lib/telemetryEnvelope.js buildPingEnvelope; no Azure Analysis/*.json in repo; not a core.fact row in §3 inventory."
+    }
+  ]
+}

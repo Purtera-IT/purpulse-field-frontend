@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "qc_event",
+  "description": "Canonical qc_event for core.fact_qc_event (Iteration 8). Immutable QC review / label facts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id",
+    "reviewer_id",
+    "artifact_id",
+    "review_timestamp",
+    "validation_result",
+    "defect_flag",
+    "retest_flag"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "qc_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "reviewer_id": { "type": "string" },
+    "artifact_id": { "type": "string" },
+    "qc_task_id": { "type": ["string", "null"] },
+    "review_timestamp": { "type": "string", "format": "date-time" },
+    "validation_result": {
+      "type": "string",
+      "enum": ["passed", "failed", "needs_review"]
+    },
+    "defect_flag": { "type": "boolean" },
+    "retest_flag": { "type": "boolean" },
+    "confidence": { "type": ["number", "null"] },
+    "bbox": { "type": ["object", "null"] },
+    "approved_for_training": { "type": ["boolean", "null"] },
+    "review_notes": { "type": ["string", "null"] },
+    "step_instance_id": { "type": ["string", "null"] }
+  }
+}

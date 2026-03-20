@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   CheckCircle2, Lock, ChevronDown, ChevronUp, AlertOctagon,
-  Zap, BarChart3, ShieldAlert,
+  Zap, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -14,6 +14,10 @@ import TaskOverrideModal from './TaskOverrideModal';
 import { getRunbook } from '../../lib/mockRunbook';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import BlockerForm from './BlockerForm';
+import { useAuth } from '@/lib/AuthContext';
+import { emitRunbookStepEvent } from '@/lib/runbookStepEvent';
+import { emitEscalationEvent } from '@/lib/escalationEvent';
+import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
 
 const PHASE_COLORS = {
   amber:   { bg: 'bg-amber-100',   text: 'text-amber-800',   bar: 'bg-amber-500',   ring: 'border-amber-300'  },
@@ -71,6 +75,7 @@ function OverallProgress({ phases, tasks }) {
 }
 
 export default function TasksTab({ job }) {
+  const { user } = useAuth();
   const rawPhases = getRunbook(job);
   const [phases,         setPhases]         = useState(rawPhases);
   const [collapsedPhases,setCollapsedPhases] = useState({});
@@ -190,7 +195,9 @@ export default function TasksTab({ job }) {
                       orderNum={order}
                       isPhaseUnlocked={unlocked}
                       onComplete={(taskId) => handleTaskComplete(phaseIdx, taskId)}
-                      onEscalate={(t) => setEscalateTask(t)}
+                      job={job}
+                      phaseId={phase.id}
+                      onEscalate={(t) => setEscalateTask({ task: t, phaseId: phase.id })}
                     />
                   );
                 })}
@@ -220,12 +227,59 @@ export default function TasksTab({ job }) {
             </div>
             {escalateTask && (
               <p className="text-xs text-slate-500 mb-4 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
-                Task: <strong>{escalateTask.title}</strong>
+                Task: <strong>{escalateTask.task?.title}</strong>
               </p>
             )}
             <BlockerForm
               jobId={job?.id}
-              onSubmitted={() => { setEscalateTask(null); toast.success('Issue escalated to dispatcher'); }}
+              onClose={() => setEscalateTask(null)}
+              onSubmitted={async (submission) => {
+                const ctx = escalateTask;
+                if (!ctx?.task || !job?.id) return;
+                let jobForEvent = job;
+                try {
+                  const jobCtx = await fetchJobContextForArtifactEvent(job.id);
+                  jobForEvent = { ...job, ...jobCtx };
+                } catch (fetchErr) {
+                  console.warn('[escalation_event] job context fetch failed; using job row only', fetchErr);
+                }
+                try {
+                  const noteTail = submission?.noteText?.trim() ? ` — ${submission.noteText.trim()}` : '';
+                  await emitEscalationEvent({
+                    job: jobForEvent,
+                    user,
+                    reasonCategory: submission?.blockerType ?? 'runbook_task_escalation',
+                    escalationSource: 'runbook_escalation',
+                    severity: submission?.severityLevel ?? null,
+                    escalationRecordId:
+                      submission?.blocker?.id != null ? String(submission.blocker.id) : null,
+                    notesPreview: `Task: ${ctx.task.title}${noteTail}`,
+                  });
+                } catch (e) {
+                  console.warn('[escalation_event] runbook_escalation enqueue failed', e);
+                }
+                try {
+                  await emitRunbookStepEvent({
+                    job,
+                    user,
+                    step: {
+                      id: ctx.task.id,
+                      title: ctx.task.title,
+                      name: ctx.task.title,
+                      step_family: ctx.task.step_family ?? ctx.task.family ?? ctx.task.category,
+                    },
+                    phaseMeta: {
+                      sr_version: String(job?.runbook_version ?? '0.0.0'),
+                    },
+                    phaseId: ctx.phaseId ?? null,
+                    stepOutcome: 'escalated',
+                    durationMinutes: 0,
+                    blockerFlag: true,
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Could not queue runbook step telemetry');
+                }
+              }}
             />
           </div>
         </SheetContent>

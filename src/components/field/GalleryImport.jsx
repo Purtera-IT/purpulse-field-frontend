@@ -3,8 +3,8 @@
  * Multi-select gallery picker with batch tagging, quality selection, compress toggle.
  * Per-file metadata edit before queueing.
  */
-import React, { useRef, useState, useCallback } from 'react';
-import { Images, X, CheckSquare, Square, ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Images, X, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EvidenceMetadataForm from './EvidenceMetadataForm';
 

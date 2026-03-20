@@ -12,7 +12,7 @@
  *
  * All-clear gated: every item must be confirmed before CTA unlocks.
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { ShieldCheck, AlertTriangle, X, PenLine, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

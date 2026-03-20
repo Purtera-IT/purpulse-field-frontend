@@ -22,6 +22,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { setFile, getFile, deleteFile, pruneOrphanedFiles } from '@/lib/indexedFileStore';
+import {
+  emitArtifactEventForCompletedUpload,
+  fetchJobContextForArtifactEvent,
+} from '@/lib/artifactEvent';
 
 // ── Config ────────────────────────────────────────────────────────────
 const QUEUE_KEY              = 'purpulse_upload_queue_v3';
@@ -157,6 +161,23 @@ async function uploadItemOnce(item) {
       size_bytes:  file.size,
     });
 
+    try {
+      const job = await fetchJobContextForArtifactEvent(currentItem.jobId);
+      await emitArtifactEventForCompletedUpload({
+        job,
+        user: null,
+        evidence,
+        metadata: currentItem.metadata,
+        photoUploadedCount: 1,
+        photoRequiredCount:
+          typeof currentItem.metadata?.photo_required_count === 'number'
+            ? currentItem.metadata.photo_required_count
+            : null,
+      });
+    } catch (err) {
+      console.warn('[artifact_event] failed to enqueue after upload', err);
+    }
+
     // Cleanup IDB blob after confirmed upload
     await deleteFile(item.id).catch(() => {});
     const url = previewStore.get(item.id);
@@ -233,7 +254,7 @@ export function useUploadQueue(queryClient) {
     } else if (navigator.onLine) {
       processNext();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Auto-flush when connectivity restored
   useEffect(() => {

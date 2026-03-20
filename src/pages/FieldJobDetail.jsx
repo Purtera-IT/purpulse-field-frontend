@@ -10,6 +10,12 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import { jobRepository } from '@/lib/repositories/jobRepository';
+import { useAuth } from '@/lib/AuthContext';
+import {
+  buildCanonicalJobContextString,
+  emitJobContextFieldIfChanged,
+} from '@/lib/jobContextField';
+import { getTechnicianIdForCanonicalEvents } from '@/lib/technicianId';
 
 import JobOverview      from '@/components/fieldv2/JobOverview';
 import RunbookSteps     from '@/components/fieldv2/RunbookSteps';
@@ -41,6 +47,7 @@ export default function FieldJobDetail() {
   const [tab, setTab] = useState(initTab);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   // Track online/offline status
   React.useEffect(() => {
@@ -61,6 +68,27 @@ export default function FieldJobDetail() {
     enabled:  !!jobId,
     staleTime: 30_000,
   });
+
+  const techKey = getTechnicianIdForCanonicalEvents(user);
+  const contextDedupeKey = job ? buildCanonicalJobContextString(job, techKey) : '';
+
+  React.useEffect(() => {
+    if (!job?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await emitJobContextFieldIfChanged({ job, user });
+        if (import.meta.env.DEV && result.emitted) {
+          console.debug('[job_context_field] emitted', result.fingerprint?.slice(0, 16));
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[job_context_field] snapshot failed', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, contextDedupeKey, techKey, user]);
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['fj-evidence', jobId],

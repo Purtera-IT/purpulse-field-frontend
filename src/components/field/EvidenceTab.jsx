@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import EvidenceCapture from './EvidenceCapture';
-import EvidenceGallery from './EvidenceGallery';
 import EvidenceTable from './EvidenceTable';
 import EvidenceList from './EvidenceList';
 import { Camera, CheckCircle2, Circle, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export default function EvidenceTab({ job }) {
   const [activeType,   setActiveType]   = useState(null);

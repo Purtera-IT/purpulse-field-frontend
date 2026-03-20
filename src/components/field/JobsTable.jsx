@@ -3,11 +3,11 @@
  * Server-side sort + pagination via base44 entities.
  * Multi-select with bulk actions.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
-  CheckSquare, Square, MoreHorizontal, ExternalLink, Package,
+  CheckSquare, Square, ExternalLink, Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';

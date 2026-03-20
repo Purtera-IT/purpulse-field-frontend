@@ -6,10 +6,12 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Search, RefreshCw, UserCheck, Filter, ChevronDown, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Search, RefreshCw, UserCheck, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import AdminShell from '../components/admin/AdminShell';
+import { useAuth } from '@/lib/AuthContext';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
 
 const STATUS_COLORS = {
   assigned:         'bg-slate-100 text-slate-700',
@@ -70,6 +72,7 @@ export default function AdminJobs() {
   const [filterPriority, setFilterPriority] = useState('all');
   const [reassignJob, setReassignJob] = useState(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['jobs'],
@@ -81,7 +84,24 @@ export default function AdminJobs() {
   });
 
   const updateJob = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Job.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      if (data?.status != null) {
+        const list = queryClient.getQueryData(['jobs']) || [];
+        const job = list.find((j) => j.id === id) || { id };
+        try {
+          await emitDispatchEventForJobStatusChange({
+            job,
+            targetAppStatus: data.status,
+            user,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error(msg);
+          throw e;
+        }
+      }
+      return base44.entities.Job.update(id, data);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
   });
 

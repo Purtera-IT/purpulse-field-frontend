@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "arrival_event",
+  "description": "Canonical arrival_event for core.fact_arrival_event (Iteration 4 baseline — timestamps first, no geofence samples).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "event_name",
+    "event_ts_utc",
+    "client_ts",
+    "source_system",
+    "job_id",
+    "technician_id"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "event_name": { "const": "arrival_event" },
+    "event_ts_utc": { "type": "string", "format": "date-time" },
+    "client_ts": { "type": "string", "format": "date-time" },
+    "source_system": { "const": "field_app" },
+    "project_id": { "type": ["string", "null"] },
+    "device_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "job_id": { "type": "string" },
+    "dispatch_id": { "type": ["string", "null"] },
+    "technician_id": { "type": "string" },
+    "site_id": { "type": ["string", "null"] },
+    "connectivity_state": {
+      "type": ["string", "null"],
+      "enum": ["offline", "cellular", "wifi", "unknown", null]
+    },
+    "telemetry_consent": {
+      "type": "object",
+      "required": ["location", "device"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "boolean" },
+        "device": { "type": "boolean" }
+      }
+    },
+    "location": { "type": ["object", "null"] },
+    "checkin_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "geofence_arrival_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "work_start_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "access_granted_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "location_consent_state": { "type": ["string", "null"] },
+    "location_precise_allowed": { "type": ["boolean", "null"] },
+    "required_docs_opened_flag": { "type": ["boolean", "null"] },
+    "risk_flag_ack_flag": { "type": ["boolean", "null"] },
+    "customer_notes_review_flag": { "type": ["boolean", "null"] },
+    "site_constraint_ack_flag": { "type": ["boolean", "null"] },
+    "step_sequence_preview_flag": { "type": ["boolean", "null"] }
+  }
+}

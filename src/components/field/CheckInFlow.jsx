@@ -2,19 +2,31 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { MapPin, Loader2, Navigation, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
 
 export default function CheckInFlow({ job, onCheckIn }) {
   const [step, setStep] = useState('initial');
   const [geoStatus, setGeoStatus] = useState(null);
   const [manualReason, setManualReason] = useState('');
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const checkInMutation = useMutation({
     mutationFn: async (data) => {
+      const location =
+        data.lat != null && data.lon != null
+          ? { lat: data.lat, lon: data.lon, accuracy_m: data.accuracyM }
+          : null;
+      await emitDispatchEventForJobStatusChange({
+        job,
+        targetAppStatus: 'checked_in',
+        user,
+        location,
+      });
       await base44.entities.Job.update(job.id, {
         status: 'checked_in',
         check_in_time: new Date().toISOString(),
@@ -26,6 +38,9 @@ export default function CheckInFlow({ job, onCheckIn }) {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Checked in successfully');
       onCheckIn?.();
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : 'Check-in failed');
     },
   });
 
