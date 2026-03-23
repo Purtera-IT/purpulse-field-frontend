@@ -9,6 +9,8 @@ import { Search, Loader2, ChevronRight, WifiOff, Briefcase, MapPin, Calendar, Us
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { apiClient } from '@/api/client';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator';
 
 const STATUS_CFG = {
   assigned:         { label: 'Assigned',    bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400',   border: 'border-slate-200'   },
@@ -121,11 +123,14 @@ export default function FieldJobs() {
   const [search,  setSearch]  = useState('');
   const [statusF, setStatusF] = useState('all');
 
-  const { data: jobs = [], isLoading } = useQuery({
+  const { data: jobs = [], isLoading, refetch } = useQuery({
     queryKey: ['field-jobs'],
     queryFn:  () => apiClient.getJobs(),
     staleTime: 30_000,
   });
+
+  const { containerRef, pullDistance, refreshing, onTouchStart, onTouchMove, onTouchEnd } =
+    usePullToRefresh(refetch);
 
   const filtered = jobs.filter(j => {
     const q = search.toLowerCase();
@@ -190,7 +195,15 @@ export default function FieldJobs() {
       </div>
 
       {/* ── Job list ──────────────────────────────── */}
-      <div className="max-w-2xl mx-auto pb-28">
+      <div
+        ref={containerRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className="max-w-2xl mx-auto pb-28 relative"
+        style={{ touchAction: 'pan-y' }}
+      >
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
         {isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
