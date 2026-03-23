@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Clock, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { SelectSheet } from '@/components/ui/BottomSheet';
 
 const ENTRY_TYPES = [
   { value: 'work_start',   label: 'Work Started',   color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
@@ -53,7 +54,10 @@ export default function ManualEntrySheet({ existingEntry, jobs, date, onSave, on
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-auto bg-white rounded-t-3xl p-5 pb-10 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div
+        className="relative w-full max-w-lg mx-auto bg-white rounded-t-3xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+      >
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
 
         <div className="flex items-center justify-between mb-5">
@@ -108,13 +112,13 @@ export default function ManualEntrySheet({ existingEntry, jobs, date, onSave, on
         {jobs.length > 0 && (
           <div className="mb-4">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Job</p>
-            <select
+            <SelectSheet
               value={jobId}
-              onChange={e => setJobId(e.target.value)}
-              className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-slate-400"
-            >
-              {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
-            </select>
+              onChange={setJobId}
+              title="Select Job"
+              placeholder="Select a job…"
+              options={jobs.map(j => ({ value: j.id, label: j.title }))}
+            />
           </div>
         )}
 
