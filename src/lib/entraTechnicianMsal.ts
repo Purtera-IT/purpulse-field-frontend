@@ -6,10 +6,9 @@
  * See `docs/plans/hybrid-entra-technicians.md`.
  */
 
-import type { PublicClientApplication } from '@azure/msal-browser'
-
-let pca: PublicClientApplication | null = null
-let initPromise: Promise<PublicClientApplication | null> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let pca: any | null = null
+let initPromise: Promise<any | null> | null = null
 
 async function getOrCreatePca(): Promise<PublicClientApplication | null> {
   if (import.meta.env.VITE_USE_ENTRA_TOKEN_FOR_AZURE_API !== 'true') return null
