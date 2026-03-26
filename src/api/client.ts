@@ -8,6 +8,8 @@ import {
   TimeEntrySchema,
   MeetingSchema,
   AuthResponseSchema,
+  AssignmentsListResponseSchema,
+  TechnicianMeResponseSchema,
   type Job,
   type Technician,
   type Evidence,
@@ -15,8 +17,12 @@ import {
   type TimeEntry,
   type Meeting,
   type AuthResponse,
+  type ResolvedAssignment,
+  type TechnicianMe,
 } from './types'
 import { base44 } from '@/api/base44Client'
+import { authManager } from '@/lib/auth'
+import { assignmentToJob } from '@/lib/assignments/assignmentToJob'
 
 /**
  * APIClient — Centralized API adapter with retry logic, validation, and typed responses
@@ -32,6 +38,8 @@ interface RetryConfig {
 
 interface RequestConfig {
   signal?: AbortSignal
+  /** Merge Dexie-cached runbook progress when hydrating PurPulse assignments */
+  mergeCachedJob?: Job | null
 }
 
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
@@ -47,6 +55,28 @@ const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'DELETE', 'PUT'])
 /**
  * Validate response against Zod schema and log validation errors
  */
+/** Prefer Entra MSAL token for Azure API when hybrid flag is on; else Base44. */
+async function getBearerTokenForAzureApi(): Promise<string | null> {
+  if (import.meta.env.VITE_USE_ENTRA_TOKEN_FOR_AZURE_API === 'true') {
+    try {
+      const { getEntraAccessTokenForAzureApi } = await import('@/lib/entraTechnicianMsal')
+      const token = await getEntraAccessTokenForAzureApi()
+      if (token) return token
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn('[API] Entra token for Azure API unavailable', e)
+      }
+    }
+  }
+  return authManager.getAccessToken()
+}
+
+function usePurpulseAssignmentsApi(): boolean {
+  const use = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
+  const base = import.meta.env.VITE_AZURE_API_BASE_URL
+  return use && typeof base === 'string' && base.trim().length > 0
+}
+
 function validateResponse<T>(data: unknown, schema: z.ZodSchema<T>, endpoint: string): T {
   try {
     return schema.parse(data)
@@ -170,9 +200,23 @@ export class APIClient {
   }
 
   /**
-   * GET /jobs — List all jobs with retry
+   * GET /jobs — List jobs: PurPulse assignments API when enabled, else Base44 (or dev axios).
    */
   async getJobs(config?: RequestConfig): Promise<Job[]> {
+    if (usePurpulseAssignmentsApi()) {
+      const me = await this.getTechnicianMe(config)
+      if (!me) {
+        if (import.meta.env.DEV) {
+          console.warn('[API] getJobs: assignments API on but GET /api/me returned null — no jobs')
+        }
+        return []
+      }
+      const email =
+        me.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(me.email) ? me.email : 'technician@field.local'
+      const assignments = await this.getAssignments(me.internal_technician_id, config)
+      return assignments.map((a) => assignmentToJob(a, { technicianEmail: email }))
+    }
+
     if (process.env.NODE_ENV === 'development') {
       return withRetry(
         async () => {
@@ -197,9 +241,25 @@ export class APIClient {
   }
 
   /**
-   * GET /jobs/:id — Get single job
+   * GET /jobs/:id — Single job: match PurPulse assignment by work order UUID when API enabled.
    */
   async getJob(jobId: string, config?: RequestConfig): Promise<Job | null> {
+    if (usePurpulseAssignmentsApi()) {
+      const me = await this.getTechnicianMe(config)
+      if (!me) return null
+      const email =
+        me.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(me.email) ? me.email : 'technician@field.local'
+      const assignments = await this.getAssignments(me.internal_technician_id, config)
+      const a = assignments.find((x) => x.job_id === jobId)
+      if (a) {
+        return assignmentToJob(a, {
+          technicianEmail: email,
+          mergeCachedJob: config?.mergeCachedJob ?? null,
+        })
+      }
+      return null
+    }
+
     if (process.env.NODE_ENV === 'development') {
       return withRetry(
         async () => {
@@ -221,6 +281,109 @@ export class APIClient {
       'GET',
       this.retryConfig
     )
+  }
+
+  /**
+   * GET /api/assignments — Resolved jobs + runbook for an internal technician (Option A).
+   * Requires `VITE_USE_ASSIGNMENTS_API=true` and `VITE_AZURE_API_BASE_URL`; otherwise returns [].
+   */
+  async getAssignments(
+    assignedToInternalId: string,
+    config?: RequestConfig
+  ): Promise<ResolvedAssignment[]> {
+    const useApi = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
+    const baseRaw = import.meta.env.VITE_AZURE_API_BASE_URL
+    const base = typeof baseRaw === 'string' ? baseRaw.trim().replace(/\/$/, '') : ''
+    if (!useApi || !base || !assignedToInternalId?.trim()) {
+      return []
+    }
+
+    const token = await getBearerTokenForAzureApi()
+    if (!token) {
+      if (import.meta.env.DEV) {
+        console.warn('[API] getAssignments: no access token')
+      }
+      return []
+    }
+
+    const url = `${base}/api/assignments?assigned_to=${encodeURIComponent(assignedToInternalId.trim())}`
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      signal: config?.signal,
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(
+        `GET /api/assignments failed: ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`
+      )
+    }
+
+    const data: unknown = await res.json().catch(() => ({}))
+    const parsed = AssignmentsListResponseSchema.safeParse(data)
+    if (!parsed.success) {
+      console.error('[API] getAssignments: response shape', parsed.error.flatten())
+      return []
+    }
+    return parsed.data.assignments
+  }
+
+  /**
+   * GET /api/me — Resolve JWT to technicians row (email / idp_subject).
+   * Requires `VITE_USE_ASSIGNMENTS_API=true` and `VITE_AZURE_API_BASE_URL`.
+   * Returns null if not provisioned (404) or feature off.
+   */
+  async getTechnicianMe(config?: RequestConfig): Promise<TechnicianMe | null> {
+    const useApi = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
+    const baseRaw = import.meta.env.VITE_AZURE_API_BASE_URL
+    const base = typeof baseRaw === 'string' ? baseRaw.trim().replace(/\/$/, '') : ''
+    if (!useApi || !base) {
+      return null
+    }
+
+    const token = await getBearerTokenForAzureApi()
+    if (!token) {
+      return null
+    }
+
+    const url = `${base}/api/me`
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      signal: config?.signal,
+    })
+
+    if (res.status === 404) {
+      return null
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(
+        `GET /api/me failed: ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`
+      )
+    }
+
+    const data: unknown = await res.json().catch(() => ({}))
+    return validateResponse(data, TechnicianMeResponseSchema, 'GET /api/me')
+  }
+
+  /**
+   * GET /api/me then GET /api/assignments — runbooks for the logged-in technician.
+   */
+  async getResolvedAssignmentsForCurrentUser(config?: RequestConfig): Promise<ResolvedAssignment[]> {
+    const me = await this.getTechnicianMe(config)
+    if (!me) {
+      return []
+    }
+    return this.getAssignments(me.internal_technician_id, config)
   }
 
   /**
@@ -373,4 +536,14 @@ export class APIClient {
 export const apiClient = new APIClient()
 
 // Export types for use in components
-export { type Job, type Technician, type Evidence, type LabelRecord, type TimeEntry, type Meeting, type AuthResponse }
+export {
+  type Job,
+  type Technician,
+  type Evidence,
+  type LabelRecord,
+  type TimeEntry,
+  type Meeting,
+  type AuthResponse,
+  type ResolvedAssignment,
+  type TechnicianMe,
+}

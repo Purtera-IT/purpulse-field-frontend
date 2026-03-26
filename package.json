@@ -9,6 +9,8 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "validate:canonical-manifest": "node scripts/validate-canonical-manifest.mjs",
+    "smoke:technician-assignments-api": "node scripts/smoke-technician-assignments-api.mjs",
+    "verify:azure-api-host": "bash scripts/azure/verify-purpulse-api-host.sh",
     "test": "vitest run",
     "test:iteration13": "vitest run src/tests/iteration13Qa.test.js src/tests/iteration13TelemetryQueue.test.js",
     "typecheck": "tsc -p ./jsconfig.json",
@@ -17,6 +19,7 @@
     "build-storybook": "storybook build -c src/.storybook -o storybook-static"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.30.0",
     "@base44/sdk": "^0.8.23",
     "@base44/vite-plugin": "^1.0.6",
     "@hello-pangea/dnd": "^17.0.0",

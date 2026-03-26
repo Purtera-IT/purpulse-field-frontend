@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "Azure Function sources; CommonJS so require() works despite repo root type module"
+}

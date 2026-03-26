@@ -2,7 +2,7 @@
  * FieldJobs — Job list page (A)
  * Mobile-first, uses JobsAdapter; unified status tokens + pull-to-refresh.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Loader2, ChevronRight, AlertCircle, Briefcase, Calendar, User } from 'lucide-react';
@@ -28,6 +28,11 @@ const PRIO_CFG = {
   low: { label: 'Low', dot: 'bg-slate-300', text: 'text-slate-500' },
 };
 const FILTER_CHIPS = ['all','assigned','in_progress','paused','pending_closeout','approved'];
+
+const assignmentsListMode =
+  import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true' &&
+  typeof import.meta.env.VITE_AZURE_API_BASE_URL === 'string' &&
+  import.meta.env.VITE_AZURE_API_BASE_URL.trim().length > 0;
 
 function StatusBadge({ status }) {
   const c = getFieldJobStatusDisplay(status);
@@ -64,6 +69,9 @@ function ActualVsPlanned({ planned, actual }) {
 
 function JobCard({ job }) {
   const prio = PRIO_CFG[job.priority] || PRIO_CFG.medium;
+  const runbookIssue =
+    job.assignment_source === 'purpulse_api' &&
+    (!job.runbook_phases?.length || job.assignment_debug?.reason_code);
   return (
     <Link to={`/FieldJobDetail?id=${job.id}`}
       className={cn('flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors', FIELD_CARD)}
@@ -72,6 +80,16 @@ function JobCard({ job }) {
         <div className="flex items-start gap-2 mb-1">
           <p className="text-sm font-bold text-slate-900 flex-1 leading-snug line-clamp-2">{job.title}</p>
           <StatusBadge status={job.status} />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
+          {job.external_id && (
+            <span className="text-[10px] font-mono font-bold text-slate-500">WO {job.external_id}</span>
+          )}
+          {runbookIssue && (
+            <span className="text-[9px] font-bold uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+              Runbook
+            </span>
+          )}
         </div>
         <p className="text-xs text-slate-400 truncate mb-1.5">{job.project_name || job.site_name || '—'}</p>
         <div className="flex items-center gap-2 sm:gap-3 text-[11px] flex-wrap">
@@ -121,7 +139,7 @@ export default function FieldJobs() {
   }, []);
 
   const { data: jobs = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['field-jobs'],
+    queryKey: ['field-jobs', assignmentsListMode ? 'purpulse' : 'base44'],
     queryFn:  () => apiClient.getJobs(),
     staleTime: 30_000,
   });
@@ -137,10 +155,33 @@ export default function FieldJobs() {
     return matchQ && matchS;
   });
 
+  const sortedJobs = useMemo(() => {
+    const copy = [...filtered];
+    const pri = (s) =>
+      s === 'in_progress' || s === 'checked_in' || s === 'en_route' ? 0 : 1;
+    copy.sort((a, b) => {
+      const p = pri(a.status) - pri(b.status);
+      if (p !== 0) return p;
+      const ta = a.scheduled_date ? new Date(a.scheduled_date).getTime() : 0;
+      const tb = b.scheduled_date ? new Date(b.scheduled_date).getTime() : 0;
+      return ta - tb;
+    });
+    return copy;
+  }, [filtered]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="sticky top-0 z-10 bg-white border-b border-slate-200/80">
         <div className={cn(FIELD_MAX_WIDTH, 'mx-auto', FIELD_PAGE_PAD_X, 'pt-3 pb-2 space-y-2')}>
+          {!isOnline && (
+            <div
+              className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-950"
+              role="status"
+            >
+              <span className="font-bold">Offline.</span>{' '}
+              Job list may be stale until you reconnect.
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input value={search} onChange={e => setSearch(e.target.value)}
@@ -211,7 +252,7 @@ export default function FieldJobs() {
             <p className="text-xs text-slate-400">Try another status or clear search.</p>
           </div>
         ) : (
-          filtered.map(job => <JobCard key={job.id} job={job} />)
+          sortedJobs.map(job => <JobCard key={job.id} job={job} />)
         )}
       </div>
     </div>

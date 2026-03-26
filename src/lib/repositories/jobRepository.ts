@@ -25,7 +25,7 @@ export class JobRepository {
 
     // Otherwise fetch from network
     try {
-      const job = await apiClient.getJob(jobId)
+      const job = await apiClient.getJob(jobId, { mergeCachedJob: snapshot?.data ?? null })
       if (job) {
         // Cache the result
         await db.jobs.add({

@@ -1,10 +1,10 @@
 /**
  * JobOverview — Job context, lifecycle transitions (authoritative), work timer, site/contact.
  */
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useMemo } from 'react';
 import {
   Phone, Mail, User, Clock, Building2,
-  AlertTriangle, FileText,
+  AlertTriangle, FileText, MapPin, Package, ListChecks, Radio,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -24,6 +24,12 @@ import {
   FIELD_STACK_GAP,
 } from '@/lib/fieldVisualTokens';
 import { jobHasSiteCoordinates } from '@/lib/siteOpenInMapsUrl';
+import {
+  extractEquipmentAndDeliverables,
+  extractProvider,
+  extractServiceWindow,
+  formatServiceWindowLines,
+} from '@/lib/runbook/runbookJobHydration';
 
 const JobSiteMapLazy = lazy(() => import('@/components/field/JobSiteMap'));
 
@@ -60,14 +66,64 @@ export default function JobOverview({
   onNavigateToSection,
   runbookComplete,
   hasSignature,
+  isOnline = true,
 }) {
   const stat = LIFECYCLE_DISPLAY[job.status] || LIFECYCLE_DISPLAY.assigned;
   const showSiteSection = Boolean(
     job.site_name || job.site_address || jobHasSiteCoordinates(job)
   );
 
+  const ac = job.runbook_assignment_context;
+  const serviceWindow = useMemo(() => extractServiceWindow(ac), [ac]);
+  const windowLines = useMemo(
+    () => formatServiceWindowLines(serviceWindow, { mode: 'device' }),
+    [serviceWindow]
+  );
+  const windowLinesSite = useMemo(
+    () =>
+      serviceWindow.timezoneIana
+        ? formatServiceWindowLines(serviceWindow, { mode: 'site' })
+        : null,
+    [serviceWindow]
+  );
+  const provider = useMemo(() => extractProvider(ac), [ac]);
+  const equipmentDeliverables = useMemo(() => {
+    if (job.assignment_source !== 'purpulse_api') return { equipment: [], deliverables: [] };
+    return extractEquipmentAndDeliverables({
+      schema: 'runbook_v2',
+      program_context: job.runbook_program_context || {},
+      assignment_context: job.runbook_assignment_context || {},
+    });
+  }, [job]);
+
+  const showPurpulseSchedule =
+    job.assignment_source === 'purpulse_api' &&
+    (serviceWindow.startIso || serviceWindow.endIso || serviceWindow.estimatedMinutes != null);
+
   return (
     <div className={FIELD_STACK_GAP}>
+      {!isOnline && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-xs text-amber-950"
+          role="status"
+        >
+          <p className="font-bold">Offline</p>
+          <p className={cn(FIELD_META, 'mt-0.5 text-amber-900')}>
+            Data may be out of date. Changes save on this device and sync when you reconnect.
+          </p>
+        </div>
+      )}
+
+      {job.assignment_source === 'purpulse_api' && job.assignment_debug?.reason_code ? (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-950"
+          role="status"
+        >
+          <p className="font-bold">Runbook</p>
+          <p className="mt-0.5 leading-snug">{String(job.assignment_debug.reason_code)}</p>
+        </div>
+      ) : null}
+
       <FieldSectionCard>
         <div className={cn(FIELD_INNER_STACK)}>
           <div className="flex items-center justify-between">
@@ -112,6 +168,105 @@ export default function JobOverview({
           )}
         </div>
       </FieldSectionCard>
+
+      {showPurpulseSchedule && (
+        <FieldSectionCard title="Schedule">
+          <div className={FIELD_INNER_STACK}>
+            <InfoRow icon={MapPin} label="Service window">
+              <span className="leading-snug">{windowLines.primary}</span>
+            </InfoRow>
+            {windowLines.secondary ? (
+              <p className={cn(FIELD_META, 'pl-10 -mt-1')}>{windowLines.secondary}</p>
+            ) : null}
+            {windowLinesSite?.primary && windowLinesSite.secondary ? (
+              <>
+                <p className={cn(FIELD_META, 'pl-10 pt-1 border-t border-slate-100')}>
+                  {windowLinesSite.secondary}
+                </p>
+                <p className={cn(FIELD_BODY, 'text-slate-700 pl-10 text-sm')}>{windowLinesSite.primary}</p>
+              </>
+            ) : null}
+            {serviceWindow.estimatedMinutes != null ? (
+              <InfoRow icon={Clock} label="Estimated duration">
+                {serviceWindow.estimatedMinutes} min
+              </InfoRow>
+            ) : null}
+          </div>
+        </FieldSectionCard>
+      )}
+
+      {(provider.display || provider.dispatch_phone) && (
+        <FieldSectionCard title="Provider / dispatch">
+          <div className={FIELD_INNER_STACK}>
+            {provider.display ? (
+              <InfoRow icon={Radio} label="Provider">{provider.display}</InfoRow>
+            ) : null}
+            {provider.dispatch_phone ? (
+              <InfoRow icon={Phone} label="Dispatch" href={`tel:${provider.dispatch_phone}`}>
+                <span className="text-blue-600">{provider.dispatch_phone}</span>
+              </InfoRow>
+            ) : null}
+            {provider.fieldnation_provider_id ? (
+              <p className={cn(FIELD_META, 'text-[11px]')}>Provider ID: {provider.fieldnation_provider_id}</p>
+            ) : null}
+          </div>
+        </FieldSectionCard>
+      )}
+
+      {equipmentDeliverables.equipment.length > 0 && (
+        <FieldSectionCard title="Equipment">
+          <p className={cn(FIELD_META, 'text-[11px] mb-2 px-0.5 leading-snug')}>
+            Verify before you roll. Check off as you pack or confirm on site.
+          </p>
+          <ul className="space-y-2" aria-label="Equipment checklist">
+            {equipmentDeliverables.equipment.map((row) => (
+              <li
+                key={row.id || row.label}
+                className="flex gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2"
+              >
+                <Package className="h-4 w-4 text-slate-500 flex-shrink-0 mt-0.5" aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-800">{row.label}</p>
+                  {row.notes ? <p className={cn(FIELD_META, 'mt-0.5')}>{row.notes}</p> : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </FieldSectionCard>
+      )}
+
+      {equipmentDeliverables.deliverables.length > 0 && (
+        <FieldSectionCard title="Deliverables">
+          <p className={cn(FIELD_META, 'text-[11px] mb-2 px-0.5 leading-snug')}>
+            Capture evidence in the Evidence tab; link to runbook steps when prompted.
+          </p>
+          <ul className="space-y-2" aria-label="Deliverables">
+            {equipmentDeliverables.deliverables.map((row) => (
+              <li
+                key={row.id || row.label}
+                className="flex gap-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+              >
+                <ListChecks className="h-4 w-4 text-slate-500 flex-shrink-0 mt-0.5" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-800">{row.label}</p>
+                  {row.evidence?.length ? (
+                    <p className={cn(FIELD_META, 'mt-0.5')}>Evidence: {row.evidence.join(', ')}</p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {onNavigateToSection ? (
+            <button
+              type="button"
+              onClick={() => onNavigateToSection('evidence')}
+              className={cn(FIELD_LINK_PRIMARY, 'mt-3 inline-flex min-h-11 items-center')}
+            >
+              Open Evidence
+            </button>
+          ) : null}
+        </FieldSectionCard>
+      )}
 
       <ReadinessSummaryCard job={job} timeEntries={timeEntries} />
 
@@ -188,7 +343,7 @@ export default function JobOverview({
             >
               <JobSiteMapLazy job={job} height={188} dense scrollWheelZoom={false} />
             </Suspense>
-            {job.site_address?.trim() && jobHasSiteCoordinates(job) ? (
+            {job.site_address?.trim() ? (
               <div className="px-0.5 pt-1">
                 <p className={cn(FIELD_OVERLINE)}>Address</p>
                 <p className={cn(FIELD_BODY, 'text-slate-700 mt-0.5 break-words leading-snug')}>

@@ -48,6 +48,16 @@ export const JobSchema = BaseEntity.extend({
   deliverables_remaining: z.number().optional(),
   in_geofence: z.boolean().optional(),
   sync_status: z.enum(['synced', 'pending', 'error']).optional(),
+  /** PurPulse WO runbook phases (embedded); optional for Base44-only jobs */
+  runbook_phases: z.array(z.record(z.unknown())).optional(),
+  runbook_version: z.string().optional(),
+  assignment_source: z.enum(['base44', 'purpulse_api']).optional(),
+  assignment_debug: z.record(z.unknown()).optional(),
+  fieldnation_workorder_id: z.number().nullable().optional(),
+  /** Full runbook_v2 assignment_context (PurPulse); UI reads schedule, provider, site address object */
+  runbook_assignment_context: z.record(z.unknown()).optional(),
+  /** Full runbook_v2 program_context (PurPulse); equipment/deliverables narrative */
+  runbook_program_context: z.record(z.unknown()).optional(),
 })
 
 export type Job = z.infer<typeof JobSchema>
@@ -166,6 +176,58 @@ export const MeetingSchema = BaseEntity.extend({
 })
 
 export type Meeting = z.infer<typeof MeetingSchema>
+
+// ── Option A: resolved assignments from Purpulse API (GET /api/assignments) ──
+export const AssignmentDebugSchema = z
+  .object({
+    materialized_at: z.string().nullable().optional(),
+    snapshot_source: z.string().nullable().optional(),
+    idempotency_key: z.string().nullable().optional(),
+    reason_code: z.string().nullable().optional(),
+    work_order_status: z.string().nullable().optional(),
+    site_name: z.string().nullable().optional(),
+    has_runbook_metadata: z.boolean().optional(),
+    snapshot_schema: z.string().nullable().optional(),
+  })
+  .optional()
+
+export const ResolvedAssignmentSchema = z.object({
+  job_id: z.string(),
+  title: z.string().optional(),
+  project_name: z.string().optional(),
+  scheduled_date: z.string().optional(),
+  status: z.string().optional(),
+  fieldnation_workorder_id: z.number().nullable().optional(),
+  site_name: z.string().nullable().optional(),
+  runbook_version: z.string().optional(),
+  runbook_json: z.unknown().optional(),
+  evidence_requirements: z.unknown().optional(),
+  debug: AssignmentDebugSchema,
+})
+
+export type ResolvedAssignment = z.infer<typeof ResolvedAssignmentSchema>
+
+export const AssignmentsListResponseSchema = z.object({
+  assignments: z.array(ResolvedAssignmentSchema),
+})
+
+/** GET /api/me — Azure Option A technician profile for the logged-in JWT */
+export const TechnicianMeResponseSchema = z.object({
+  /** PM DB `technicians.technician_uid` (text PK; not always UUID-shaped). */
+  internal_technician_id: z.string(),
+  email: z.union([z.string().email(), z.null()]).optional(),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  display_name: z.string().optional(),
+  fieldnation_provider_id: z.string().nullable().optional(),
+})
+
+export type TechnicianMe = z.infer<typeof TechnicianMeResponseSchema>
+
+export {
+  parseRunbookJsonFromAssignment,
+  mergeRunbookV2WithJobPhases,
+} from '@/lib/runbook/runbookV2Snapshot'
 
 // ── Auth Response ──
 export const AuthResponseSchema = z.object({

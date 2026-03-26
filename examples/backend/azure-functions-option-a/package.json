@@ -1,0 +1,13 @@
+{
+  "name": "purpulse-azure-functions-option-a",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Copy into API repo; npm install before zip deploy",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "jose": "^4.15.9",
+    "pg": "^8.13.0"
+  }
+}

@@ -1,0 +1,165 @@
+---
+description: PurTera/Purpulse field app rebuild — product mission, constraints, and structured planning output for repo audits (no implementation without explicit ask).
+alwaysApply: true
+---
+
+You are helping rebuild the PurTera / Purpulse field app into an enterprise-grade, workflow-first technician app.
+
+Read the repo thoroughly before suggesting changes. Do not implement anything yet. I want a structured plan only.
+
+## Product mission
+
+This app is for field technicians executing IT rollout jobs in the field. It should help techs arrive prepared, execute standardized runbooks, capture correct evidence, handle blockers, and complete clean closeout. It also needs to produce trustworthy operational data that can be wired into Azure/TechPulse one slice at a time.
+
+## Current problems to solve
+
+The current app has serious UX and architecture issues:
+
+- The 5 bottom tabs do not make sense.
+- The middle tab being Chat is wrong.
+- Chat appears tied to only one project/job and is not a correct communication model.
+- Deliverables / photo uploads do not map cleanly to the correct job/step/evidence target.
+- Time/job-worked data does not persist or reconcile consistently across screens/tabs.
+- The Time tab feels conceptually useless and detached from the job lifecycle.
+- The UI feels unprofessional, inconsistent, mock-data-heavy, and not enterprise-grade.
+- Information architecture is inconsistent and does not reflect a real field workflow.
+
+## Target product direction
+
+The app should be restructured around the technician workflow, not around generic tabs.
+
+The likely target flow is:
+
+Jobs list -> Job detail -> Start travel -> Arrive / check in -> Pre-arrival acknowledgements -> Tool check -> Runbook execution -> Evidence capture -> Escalation / PM context -> Closeout -> Signoff
+
+Primary principles:
+
+- Jobs are the primary navigation anchor.
+- Time should live inside job execution, not as a standalone global tab.
+- Chat should be contextual to a job/blocker/PM thread, not a primary global destination.
+- Evidence/photos must map explicitly to job + deliverable/evidence type + optional runbook step.
+- The UI should feel enterprise-grade, minimal, reliable, and field-usable.
+- Mock data should not remain in production-facing flows.
+- The app should support a clean path to Azure-backed event wiring.
+
+## Architecture principles
+
+Use these as hard constraints in your plan:
+
+- Workflow-first information architecture
+- Emit-before-mutate for important operational events
+- Offline-capable / queue-friendly mindset
+- Stable job execution state
+- Contextual evidence mapping
+- Contextual communication
+- No mock fallbacks in real user flows
+- Preserve or improve Azure integration points rather than bypassing them
+- Do not assume Field Nation buyer APIs should become the app’s main source of truth
+- Prefer deterministic data flow over convenience hacks
+
+## What I want you to do in this plan
+
+Audit the repository and produce a practical rebuild plan.
+
+### 1) Repo audit
+
+Identify:
+
+- current app shell and navigation structure
+- routing structure
+- state management approach
+- where mock data is injected
+- where time tracking logic lives
+- where chat/project context is defined
+- where deliverables/evidence/photo logic lives
+- where Azure integration/endpoints/services are wired
+- whether there are “old shell” vs “new field workflow” patterns competing in the repo
+
+### 2) Keep / refactor / delete recommendation
+
+Give me a brutally honest classification of:
+
+- what should be kept
+- what should be refactored
+- what should be deleted
+- what should be rebuilt from scratch
+
+Be specific by folder/file/component if possible.
+
+### 3) Proposed new information architecture
+
+Propose:
+
+- new global navigation
+- new page/screen hierarchy
+- what becomes job-contextual instead of global
+- what existing tabs/pages should disappear
+- the ideal structure of Job Detail
+
+### 4) State and data-flow recommendation
+
+Describe:
+
+- the app-level state model
+- job execution state model
+- time/work tracking model
+- evidence mapping model
+- chat/escalation model
+- sync/offline state model
+- where persistence should live
+
+### 5) Azure wiring map
+
+Find the current Azure-related code/services/config and describe:
+
+- what already exists
+- what appears real vs placeholder
+- what can be reused
+- what the likely wiring path is for incremental rollout
+- what user actions/screens should eventually emit canonical operational events
+
+Do not invent infrastructure that is not in the repo. Infer cautiously.
+
+### 6) Iteration roadmap
+
+Create a recommended implementation order for the rebuild.
+
+I want a step-by-step sequence, with Iteration 1 being the best first slice.
+
+For each iteration include:
+
+- goal
+- why it should happen in that order
+- major files likely affected
+- risks
+- acceptance criteria
+
+### 7) Iteration 1 recommendation
+
+At the end, tell me exactly what Iteration 1 should be.
+
+I suspect it should be the shell / navigation / IA reset, but I want your honest recommendation based on the repo.
+
+## Output format
+
+Use this exact structure:
+
+1. Executive summary
+2. Current repo findings
+3. Keep / refactor / delete
+4. Proposed target architecture
+5. Proposed navigation and screen map
+6. State/data-flow redesign
+7. Azure wiring assessment
+8. Recommended iteration roadmap
+9. Exact recommendation for Iteration 1
+10. Open risks / assumptions
+
+## Important constraints
+
+- Do not implement yet
+- Do not generate placeholder code
+- Do not preserve bad UX just to minimize code changes
+- Be blunt and practical
+- Optimize for a real enterprise field app, not a demo
+- Favor coherent workflow over scattered features

@@ -43,6 +43,50 @@ import {
   FIELD_OVERLINE,
 } from '@/lib/fieldVisualTokens';
 import { EVIDENCE_IN_FLIGHT_PHRASE } from '@/lib/fieldJobSyncPresentation';
+import { extractEquipmentAndDeliverables } from '@/lib/runbook/runbookJobHydration';
+
+function countEvidenceMatchingDeliverable(evidence, types) {
+  const active = evidence.filter((e) => e.status !== 'replaced');
+  if (!types?.length) return active.length;
+  return active.filter((e) => {
+    const et = (e.evidence_type || '').toLowerCase();
+    return types.some((w) => {
+      const needle = String(w).toLowerCase().replace(/\s+/g, '_');
+      return et.includes(needle) || needle.includes(et);
+    });
+  }).length;
+}
+
+function RunbookDeliverablesMatrix({ job, evidence }) {
+  if (job?.assignment_source !== 'purpulse_api') return null;
+  const { deliverables } = extractEquipmentAndDeliverables({
+    schema: 'runbook_v2',
+    program_context: job.runbook_program_context || {},
+  });
+  if (!deliverables.length) return null;
+  return (
+    <div className={cn(FIELD_CARD, 'p-4')}>
+      <p className={cn(FIELD_OVERLINE, 'mb-2')}>Deliverables (from runbook)</p>
+      <ul className="space-y-2">
+        {deliverables.map((d, i) => (
+          <li
+            key={d.id || `d-${i}`}
+            className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 text-xs border-b border-slate-100 pb-2 last:border-0 last:pb-0"
+          >
+            <span className="font-semibold text-slate-800">{d.label}</span>
+            <span className="text-slate-500 tabular-nums shrink-0">
+              {countEvidenceMatchingDeliverable(evidence, d.evidence)} uploaded
+              {d.evidence?.length ? ` · expects ${d.evidence.length} type(s)` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className={cn(FIELD_META, 'mt-2 leading-snug')}>
+        Counts match evidence types listed on the deliverable when present; otherwise all job evidence is counted.
+      </p>
+    </div>
+  );
+}
 
 function fmtTs(ts) {
   try {
@@ -517,12 +561,14 @@ export default function EvidenceGalleryView({
         <EvidenceRequirementsPanel job={job} evidence={evidence} onAddForRequirement={(type) => openCapture({ evidenceType: type })} />
       </div>
 
+      <RunbookDeliverablesMatrix job={job} evidence={evidence} />
+
       <EvidenceQcSummaryStrip evidence={evidence} />
 
       <button
         type="button"
         onClick={() => openCapture({})}
-        className="w-full h-11 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 text-sm font-semibold flex items-center justify-center gap-2 hover:border-slate-500 hover:text-slate-700 transition-colors"
+        className="w-full min-h-[44px] rounded-xl border-2 border-dashed border-slate-300 text-slate-500 text-sm font-semibold flex items-center justify-center gap-2 hover:border-slate-500 hover:text-slate-700 transition-colors"
       >
         <Plus className="h-4 w-4" /> Add Evidence
       </button>

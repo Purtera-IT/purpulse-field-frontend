@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { jobRepository } from '@/lib/repositories/jobRepository';
 import {
   Play,
   CheckCircle2,
@@ -32,7 +33,6 @@ import {
 } from '@/lib/runbookExecutionViewModel';
 import {
   FIELD_CARD,
-  FIELD_CTRL_H,
   FIELD_LINK_PRIMARY,
   FIELD_META,
   FIELD_OVERLINE,
@@ -64,6 +64,27 @@ const STEP_STATUS = {
   complete: { label: 'Complete', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   failed: { label: 'Failed', bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400' },
 };
+
+/** Primary runbook actions: min 44×44px touch target (field / safety). */
+const FIELD_RUNBOOK_CTRL =
+  'min-h-[44px] min-w-[44px] px-4 inline-flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold';
+
+const GATE_PRESENTATION = {
+  red_gate: { label: 'Critical', className: 'bg-red-100 text-red-900' },
+  important: { label: 'Important', className: 'bg-amber-100 text-amber-900' },
+  informational: { label: 'Info', className: 'bg-slate-100 text-slate-700' },
+};
+
+function phaseMetaBlurb(meta) {
+  if (!meta || typeof meta !== 'object') return null;
+  const o = meta;
+  const s =
+    (typeof o.description === 'string' && o.description.trim()) ||
+    (typeof o.summary === 'string' && o.summary.trim()) ||
+    (typeof o.notes === 'string' && o.notes.trim()) ||
+    null;
+  return s || null;
+}
 
 function StepTimer({ display }) {
   if (!display) return null;
@@ -228,8 +249,33 @@ function RunbookStep({
             {isFocusStep && isRunning && (
               <p className="text-[10px] font-bold text-blue-700 tracking-wide mb-0.5">Active step</p>
             )}
-            <p className="text-sm font-bold text-slate-900 truncate">{label}</p>
-            {step.description && <p className="text-[11px] text-slate-400 truncate">{step.description}</p>}
+            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+              <p className="text-sm font-bold text-slate-900 truncate flex-1 min-w-0">{label}</p>
+              {(() => {
+                const fam = step.step_family ?? step.category;
+                const g = fam && GATE_PRESENTATION[fam];
+                return g ? (
+                  <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0', g.className)}>
+                    {g.label}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+            {Array.isArray(step.required_evidence_types) && step.required_evidence_types.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {step.required_evidence_types.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[9px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {step.description && (
+              <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 text-left w-full">{step.description}</p>
+            )}
             {isOptional && (
               <span className="text-[9px] font-bold text-slate-400 mt-0.5 inline-block">Optional</span>
             )}
@@ -253,6 +299,12 @@ function RunbookStep({
 
         {open && (
           <div className="px-4 pb-4 space-y-3 border-t border-slate-100">
+            {step.description && (
+              <div className="pt-3">
+                <p className={cn(FIELD_OVERLINE, 'mb-1')}>Instructions</p>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{step.description}</p>
+              </div>
+            )}
             {phaseBlocked && (
               <div className="flex items-start gap-2 pt-2 rounded-lg bg-slate-50 px-3 py-2">
                 <Lock className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
@@ -291,11 +343,11 @@ function RunbookStep({
                   onClick={() => void handleStart()}
                   disabled={!canStart || isPending}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 rounded-xl disabled:opacity-40',
-                    FIELD_CTRL_H
+                    'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40',
+                    FIELD_RUNBOOK_CTRL
                   )}
                 >
-                  <Play className="h-3.5 w-3.5" /> Start
+                  <Play className="h-3.5 w-3.5 shrink-0" aria-hidden /> Start
                 </button>
               )}
               {uiBucket === 'in_progress' && (
@@ -305,22 +357,22 @@ function RunbookStep({
                     onClick={() => void handleComplete()}
                     disabled={isPending}
                     className={cn(
-                      'flex items-center gap-1.5 px-3 bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 rounded-xl disabled:opacity-40',
-                      FIELD_CTRL_H
+                      'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40',
+                      FIELD_RUNBOOK_CTRL
                     )}
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Complete
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden /> Pass
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleFail()}
                     disabled={isPending}
                     className={cn(
-                      'flex items-center gap-1.5 px-3 bg-red-600 text-white text-xs font-bold hover:bg-red-700 rounded-xl disabled:opacity-40',
-                      FIELD_CTRL_H
+                      'bg-red-600 text-white hover:bg-red-700 disabled:opacity-40',
+                      FIELD_RUNBOOK_CTRL
                     )}
                   >
-                    <XCircle className="h-3.5 w-3.5" /> Fail
+                    <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden /> Fail
                   </button>
                 </>
               )}
@@ -328,12 +380,9 @@ function RunbookStep({
                 <button
                   type="button"
                   onClick={() => setShowCapture(true)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 rounded-xl',
-                    FIELD_CTRL_H
-                  )}
+                  className={cn('bg-slate-900 text-white hover:bg-slate-800', FIELD_RUNBOOK_CTRL)}
                 >
-                  <Paperclip className="h-3.5 w-3.5" /> Attach evidence
+                  <Paperclip className="h-3.5 w-3.5 shrink-0" aria-hidden /> Attach evidence
                 </button>
               )}
             </div>
@@ -409,7 +458,11 @@ export default function RunbookSteps({
       const next = mergeRunbookStepOutcome(base, stepId, outcome);
       setPendingStepId(stepId);
       try {
-        await base44.entities.Job.update(job.id, { runbook_phases: next });
+        if (job?.assignment_source === 'purpulse_api') {
+          await jobRepository.saveJobSnapshot({ ...job, runbook_phases: next });
+        } else {
+          await base44.entities.Job.update(job.id, { runbook_phases: next });
+        }
         onRefresh?.();
       } finally {
         setPendingStepId(null);
@@ -419,13 +472,23 @@ export default function RunbookSteps({
   );
 
   if (!phases.length) {
+    const dbg = job?.assignment_debug;
+    const reasonCode =
+      dbg && typeof dbg === 'object' && dbg !== null && 'reason_code' in dbg
+        ? String(/** @type {Record<string, unknown>} */ (dbg).reason_code ?? '')
+        : '';
     return (
       <div className="py-12 text-center space-y-2 px-4">
-        <FileText className="h-10 w-10 text-slate-200 mx-auto" />
+        <FileText className="h-10 w-10 text-slate-200 mx-auto" aria-hidden />
         <p className="text-slate-600 text-sm font-semibold">No runbook on this job</p>
         <p className={cn(FIELD_META, 'max-w-sm mx-auto leading-snug')}>
           Runbook phases from the office will show here when they are attached to this job.
         </p>
+        {reasonCode ? (
+          <p className="text-xs font-mono text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-md mx-auto">
+            {reasonCode}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -469,6 +532,8 @@ export default function RunbookSteps({
           const completedSteps = steps.filter((s) => s.completed).length;
           const blocked = phaseBlocked[phase.id];
 
+          const metaBlurb = phaseMetaBlurb(phase.meta);
+
           return (
             <div key={phase.id} className={cn('space-y-2', blocked && 'opacity-90')}>
               <div className="flex items-center justify-between gap-2 px-0.5">
@@ -477,6 +542,9 @@ export default function RunbookSteps({
                   {completedSteps}/{steps.length} steps
                 </span>
               </div>
+              {metaBlurb && (
+                <p className={cn(FIELD_META, 'px-0.5 leading-snug')}>{metaBlurb}</p>
+              )}
 
               {blocked && (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">

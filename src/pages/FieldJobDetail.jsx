@@ -71,6 +71,10 @@ export default function FieldJobDetail() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [headerTick, setHeaderTick] = useState(0);
   const qc = useQueryClient();
+  const assignmentsListMode =
+    import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true' &&
+    typeof import.meta.env.VITE_AZURE_API_BASE_URL === 'string' &&
+    import.meta.env.VITE_AZURE_API_BASE_URL.trim().length > 0;
   const { user } = useAuth();
 
   const setSection = (id) => {
@@ -91,9 +95,16 @@ export default function FieldJobDetail() {
     };
   }, []);
 
+  const { data: jobsList = [], isLoading: jobsListLoading } = useQuery({
+    queryKey: ['field-jobs', assignmentsListMode ? 'purpulse' : 'base44'],
+    queryFn: () => apiClient.getJobs(),
+    enabled: !!jobId && assignmentsListMode,
+    staleTime: 30_000,
+  });
+
   const {
-    data: job,
-    isLoading,
+    data: jobFromRepo,
+    isLoading: jobRepoLoading,
     isError,
     error,
     refetch: refetchJob,
@@ -103,6 +114,17 @@ export default function FieldJobDetail() {
     enabled: !!jobId,
     staleTime: 30_000,
   });
+
+  const job = useMemo(() => {
+    if (jobFromRepo) return jobFromRepo;
+    if (assignmentsListMode && jobId && Array.isArray(jobsList)) {
+      const hit = jobsList.find((j) => String(j.id) === String(jobId));
+      if (hit) return hit;
+    }
+    return null;
+  }, [jobFromRepo, assignmentsListMode, jobsList, jobId]);
+
+  const isLoading = !job && (jobRepoLoading || (assignmentsListMode && jobsListLoading));
 
   const { data: timeEntries = [] } = useQuery({
     queryKey: ['fj-time-entries', jobId],
@@ -268,12 +290,31 @@ export default function FieldJobDetail() {
   }
   if (!job || !executionView) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center max-w-md mx-auto">
         <p className="text-sm font-semibold text-slate-800">Job not found</p>
-        <p className="text-xs text-slate-500 mt-2">It may have been removed or you may not have access.</p>
+        <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+          {assignmentsListMode
+            ? 'This job is not in your current assignments. It may have been reassigned, closed, or the link is outdated.'
+            : 'It may have been removed or you may not have access.'}
+        </p>
+        {assignmentsListMode && !jobsListLoading && jobsList.length === 0 && (
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 max-w-sm leading-relaxed">
+            No assignments were returned for your account. Confirm provisioning or sign-in, then retry.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ['field-jobs', assignmentsListMode ? 'purpulse' : 'base44'] });
+            refetchJob();
+          }}
+          className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-slate-900 text-white text-sm font-bold px-5 w-full max-w-xs"
+        >
+          Retry (reload assignments)
+        </button>
         <Link
           to="/FieldJobs"
-          className="mt-8 inline-flex min-h-11 items-center justify-center text-sm font-bold text-slate-900 underline underline-offset-2"
+          className="mt-4 inline-flex min-h-[44px] items-center justify-center text-sm font-bold text-slate-900 underline underline-offset-2"
         >
           Back to jobs
         </Link>
@@ -391,6 +432,7 @@ export default function FieldJobDetail() {
               timeEntries={timeEntries}
               executionView={executionView}
               hasSignature={hasSignature}
+              isOnline={isOnline}
             />
           )}
           {section === 'runbook' && <RunbookSteps {...tabProps} />}

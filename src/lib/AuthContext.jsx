@@ -5,11 +5,14 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 import { cacheUserForOffline, getCachedUserForOffline, setOfflineModeAllowed, clearOfflineCache } from '@/lib/offlineAuth';
 import { authManager } from '@/lib/auth';
 import { buildPermissions } from '@/lib/permissions';
+import { apiClient } from '@/api/client';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  /** Azure Option A: profile from GET /api/me (internal id, FN id, names) when VITE_USE_ASSIGNMENTS_API */
+  const [azureTechnicianProfile, setAzureTechnicianProfile] = useState(null);
   const [permissions, setPermissions] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -110,6 +113,17 @@ export const AuthProvider = ({ children }) => {
       cacheUserForOffline(currentUser); // Cache for offline access
       setIsAuthenticated(true);
       setAuthError(null);
+
+      setAzureTechnicianProfile(null);
+      if (import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true') {
+        try {
+          const me = await apiClient.getTechnicianMe();
+          setAzureTechnicianProfile(me);
+        } catch (err) {
+          console.warn('[Auth] Azure /api/me unavailable', err);
+        }
+      }
+
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
@@ -121,6 +135,7 @@ export const AuthProvider = ({ children }) => {
         console.warn('[Auth] Token invalid but cached user available — allowing read-only access');
         setUser(cachedUser);
         setIsAuthenticated(true);
+        setAzureTechnicianProfile(null);
         setAuthError({
           type: 'offline_mode',
           message: 'Offline mode — read-only access',
@@ -148,6 +163,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async (shouldRedirect = true) => {
     setUser(null);
+    setAzureTechnicianProfile(null);
     setPermissions(null);
     setIsAuthenticated(false);
     setAuthError(null);
@@ -173,6 +189,7 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{ 
       user,
+      azureTechnicianProfile,
       permissions,
       isAuthenticated, 
       isLoadingAuth,
