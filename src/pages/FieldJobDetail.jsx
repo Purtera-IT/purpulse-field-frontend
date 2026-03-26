@@ -2,12 +2,13 @@
  * FieldJobDetail — Single workflow surface: Overview | Runbook | Evidence | Closeout | Comms.
  * Legacy ?tab= values: timelog→overview, meetings→comms, audit→closeout.
  */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/api/client';
+import { base44 } from '@/api/base44Client';
 import { jobRepository } from '@/lib/repositories/jobRepository';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -21,6 +22,7 @@ import {
   deriveTimerSessionFromTimeEntries,
   formatWorkedDuration,
 } from '@/lib/fieldJobExecutionModel';
+import { isRunbookComplete } from '@/lib/runbookExecutionViewModel';
 import {
   FIELD_MAX_WIDTH,
   FIELD_META,
@@ -37,8 +39,7 @@ import RunbookSteps from '@/components/fieldv2/RunbookSteps';
 import EvidenceGalleryView from '@/components/fieldv2/EvidenceGalleryView';
 import JobCloseoutSection from '@/components/fieldv2/JobCloseoutSection';
 import JobCommsSection from '@/components/fieldv2/JobCommsSection';
-import OfflineEditsIndicator from '@/components/fieldv2/OfflineEditsIndicator.jsx';
-import UploadProgressIndicator from '@/components/fieldv2/UploadProgressIndicator';
+import FieldJobSyncStrip from '@/components/fieldv2/FieldJobSyncStrip';
 
 const LEGACY_TAB_ALIASES = {
   timelog: 'overview',
@@ -124,12 +125,19 @@ export default function FieldJobDetail() {
   const techKey = getTechnicianIdForCanonicalEvents(user);
   const contextDedupeKey = job ? buildCanonicalJobContextString(job, techKey) : '';
 
-  React.useEffect(() => {
-    if (!job?.id) return;
+  const jobRef = useRef(job);
+  const userRef = useRef(user);
+  jobRef.current = job;
+  userRef.current = user;
+
+  useEffect(() => {
+    if (!jobId || !contextDedupeKey) return;
+    const j = jobRef.current;
+    if (!j?.id || String(j.id) !== jobId) return;
     let cancelled = false;
     (async () => {
       try {
-        const result = await emitJobContextFieldIfChanged({ job, user });
+        const result = await emitJobContextFieldIfChanged({ job: j, user: userRef.current });
         if (import.meta.env.DEV && result.emitted) {
           console.debug('[job_context_field] emitted', result.fingerprint?.slice(0, 16));
         }
@@ -140,7 +148,7 @@ export default function FieldJobDetail() {
     return () => {
       cancelled = true;
     };
-  }, [job, contextDedupeKey, techKey, user]);
+  }, [jobId, contextDedupeKey, techKey]);
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['fj-evidence', jobId],
@@ -172,6 +180,22 @@ export default function FieldJobDetail() {
     enabled: false,
   });
 
+  /*
+   * Carry-through (NOT Iteration 12 job_context_field scope): blockers query + passing `blockers` into
+   * JobCloseoutSection exist for closeout readiness / comms (Iteration 5+). Iteration 12 only changed
+   * job-context snapshot timing above (refs + contextDedupeKey). This query should eventually move to
+   * jobRepository / apiClient — see technical debt below.
+   *
+   * TECHNICAL_DEBT: Escalation/blocker list uses base44.entities.Blocker.filter directly.
+   * Keep queryKey ['blockers', jobId] aligned with BlockerForm invalidation.
+   */
+  const { data: blockers = [] } = useQuery({
+    queryKey: ['blockers', jobId],
+    queryFn: () => (jobId ? base44.entities.Blocker.filter({ job_id: jobId }) : Promise.resolve([])),
+    enabled: !!jobId,
+    staleTime: 15_000,
+  });
+
   const invalidateAll = () => {
     [
       'fj-job',
@@ -182,6 +206,7 @@ export default function FieldJobDetail() {
       'fj-audit',
       'fj-time-entries',
     ].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
+    qc.invalidateQueries({ queryKey: ['blockers', jobId] });
   };
 
   if (!jobId) {
@@ -225,6 +250,8 @@ export default function FieldJobDetail() {
     );
   }
 
+  const runbookComplete = isRunbookComplete(job.runbook_phases);
+
   const tabProps = {
     job,
     evidence,
@@ -233,11 +260,11 @@ export default function FieldJobDetail() {
     activities,
     auditLogs,
     onRefresh: invalidateAll,
+    runbookComplete,
+    onNavigateToSection: setSection,
   };
 
   const nextStep = getNextStepMessage(job, evidence);
-  const runbookComplete =
-    job.runbook_phases?.every((phase) => phase.steps?.every((step) => step.completed)) ?? false;
   const hasSignature = !!job.signoff_signature_url;
 
   const headerWorked = formatWorkedDuration(executionView.timer.workedSeconds);
@@ -320,23 +347,29 @@ export default function FieldJobDetail() {
           FIELD_STACK_GAP
         )}
       >
-        <OfflineEditsIndicator jobId={jobId} isOnline={isOnline} />
-        <UploadProgressIndicator jobId={jobId} isOnline={isOnline} />
+        <FieldJobSyncStrip jobId={jobId} isOnline={isOnline} />
         <div>
           {section === 'overview' && (
             <JobOverview
               {...tabProps}
               timeEntries={timeEntries}
               executionView={executionView}
-              onNavigateToSection={setSection}
-              runbookComplete={runbookComplete}
               hasSignature={hasSignature}
             />
           )}
           {section === 'runbook' && <RunbookSteps {...tabProps} />}
           {section === 'evidence' && <EvidenceGalleryView {...tabProps} />}
           {section === 'closeout' && (
-            <JobCloseoutSection job={job} auditLogs={auditLogs} onRefresh={invalidateAll} />
+            <JobCloseoutSection
+              job={job}
+              evidence={evidence}
+              runbookComplete={runbookComplete}
+              timeEntries={timeEntries}
+              blockers={blockers}
+              auditLogs={auditLogs}
+              onRefresh={invalidateAll}
+              onNavigateToSection={setSection}
+            />
           )}
           {section === 'comms' && <JobCommsSection {...tabProps} />}
         </div>

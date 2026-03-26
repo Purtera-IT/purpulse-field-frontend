@@ -20,6 +20,8 @@ export type EvidenceLike = {
   file_url?: string
   runbook_step_id?: string
   upload_error?: string
+  /** Backend string; normalize with `normalizeEvidenceQcStatus` in evidenceQcViewModel */
+  qc_status?: string | null
 }
 
 export type EvidenceRequirementLike = {

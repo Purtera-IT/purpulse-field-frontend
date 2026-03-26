@@ -21,6 +21,7 @@ import {
   FIELD_BODY,
   FIELD_CARD,
   FIELD_CTRL_H,
+  FIELD_META,
   FIELD_OVERLINE,
 } from '@/lib/fieldVisualTokens';
 
@@ -143,7 +144,12 @@ export default function FieldTimeTracker({
             on this job
           </span>
         </p>
-        <p className={cn(FIELD_BODY, 'mb-3')}>{executionView.sessionSummaryLine}</p>
+        <p className={cn(FIELD_BODY, 'mb-2')}>{executionView.sessionSummaryLine}</p>
+        {canClockIn && !liveTimer.workSegmentOpen ? (
+          <p className={cn(FIELD_META, 'mb-3 leading-snug')}>
+            Third of three readiness steps: starting the timer opens a short site check before work time is recorded.
+          </p>
+        ) : null}
         <div className="flex gap-2">
           <button
             type="button"

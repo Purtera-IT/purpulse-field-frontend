@@ -1,6 +1,6 @@
 /**
- * Pre-job readiness checklist (Iteration 10).
- * Blocks "Start Job" until all items are checked; emits tool_check_event before parent continues.
+ * Pre-job readiness checklist before moving to in progress.
+ * Blocks confirm until items are checked; queues tool-check telemetry before parent continues.
  */
 import React, { useState } from 'react';
 import {
@@ -20,7 +20,7 @@ import {
   allScopeAcknowledgementsTrue,
   emptyScopeAcknowledgementState,
 } from '@/constants/scopeAcknowledgements';
-import { FIELD_CARD, FIELD_OVERLINE, FIELD_SURFACE_MUTED } from '@/lib/fieldVisualTokens';
+import { FIELD_CARD, FIELD_META, FIELD_OVERLINE, FIELD_SURFACE_MUTED } from '@/lib/fieldVisualTokens';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -92,7 +92,11 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md rounded-2xl">
+      <DialogContent
+        className="max-w-md rounded-2xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center">
@@ -101,9 +105,12 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
             <DialogTitle className="text-left">Pre-job readiness</DialogTitle>
           </div>
           <DialogDescription className="text-left text-xs leading-relaxed">
-            Complete the checklist to start work. A canonical <code className="text-[10px]">tool_check_event</code> is sent
-            for compliance and eligibility signals.
+            Part of the same readiness path as route confirmation and starting the work timer. Complete checks below to
+            continue, or exit with Cancel or the X — the backdrop won&apos;t close this by accident.
           </DialogDescription>
+          <p className={cn(FIELD_META, 'text-left leading-snug -mt-1')}>
+            Leaving without confirming keeps the job in its current state.
+          </p>
         </DialogHeader>
 
         <div className={cn(FIELD_SURFACE_MUTED, 'p-3 space-y-2')}>
@@ -127,10 +134,9 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
         </div>
 
         <div className={cn(FIELD_CARD, 'p-3 space-y-2')}>
-          <p className={FIELD_OVERLINE}>Scope &amp; docs (Iteration 11)</p>
+          <p className={FIELD_OVERLINE}>Scope &amp; documentation</p>
           <p className="text-[10px] text-slate-500 leading-snug">
-            Same signals as pre-arrival <code className="text-[9px]">arrival_event</code> flags — recorded on this{' '}
-            <code className="text-[9px]">tool_check_event</code> when you start from overview/state machine.
+            Confirm scope and documentation match what you will perform on site. This is recorded when you confirm below.
           </p>
           {SCOPE_ACKNOWLEDGEMENT_ITEMS.map((item) => (
             <label
@@ -148,13 +154,19 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
           ))}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" className="rounded-xl" onClick={() => handleOpenChange(false)} disabled={pending}>
-            Cancel
+        <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl w-full sm:w-auto"
+            onClick={() => handleOpenChange(false)}
+            disabled={pending}
+          >
+            Cancel — not ready yet
           </Button>
           <Button
             type="button"
-            className="rounded-xl bg-blue-600 hover:bg-blue-700"
+            className="rounded-xl bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
             disabled={!allReady || pending}
             onClick={() => void handleConfirm()}
           >

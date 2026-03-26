@@ -16,6 +16,7 @@ import {
   enqueueCanonicalEvent,
   flushTelemetryQueue,
   getQueueStats,
+  getTelemetryQueueDepthForJob,
   registerTelemetryQueueListeners,
 } from '@/lib/telemetryQueue';
 import { sendCanonicalEnvelope } from '@/api/telemetryIngestion';
@@ -89,5 +90,43 @@ describe('Iteration 13 — telemetryQueue', () => {
     expect(docSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
     addSpy.mockRestore();
     docSpy.mockRestore();
+  });
+
+  describe('getTelemetryQueueDepthForJob', () => {
+    it('returns zero for empty job id', async () => {
+      expect(await getTelemetryQueueDepthForJob('')).toEqual({
+        depth: 0,
+        hasPending: false,
+        sample_errors: [],
+      });
+      expect(await getTelemetryQueueDepthForJob(null)).toEqual({
+        depth: 0,
+        hasPending: false,
+        sample_errors: [],
+      });
+    });
+
+    it('counts only rows matching envelope.job_id (string-coerced)', async () => {
+      vi.mocked(sendCanonicalEnvelope).mockResolvedValue({ ok: false, retryable: true, status: 503 });
+      await enqueueCanonicalEvent(
+        minimalEnvelope({ event_id: '550e8400-e29b-41d4-a716-446655440040', job_id: 'job-a' })
+      );
+      await enqueueCanonicalEvent(
+        minimalEnvelope({ event_id: '550e8400-e29b-41d4-a716-446655440041', job_id: 'job-b' })
+      );
+      const forA = await getTelemetryQueueDepthForJob('job-a');
+      const forB = await getTelemetryQueueDepthForJob('job-b');
+      expect(forA.depth).toBe(1);
+      expect(forB.depth).toBe(1);
+      expect((await getTelemetryQueueDepthForJob('job-c')).depth).toBe(0);
+    });
+
+    it('matches numeric job id to string envelope job_id', async () => {
+      vi.mocked(sendCanonicalEnvelope).mockResolvedValue({ ok: false, retryable: true, status: 503 });
+      await enqueueCanonicalEvent(
+        minimalEnvelope({ event_id: '550e8400-e29b-41d4-a716-446655440042', job_id: '99' })
+      );
+      expect((await getTelemetryQueueDepthForJob(99)).depth).toBe(1);
+    });
   });
 });

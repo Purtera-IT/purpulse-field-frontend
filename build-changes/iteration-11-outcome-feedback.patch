@@ -1,0 +1,723 @@
+diff --git a/src/api/types.ts b/src/api/types.ts
+index e7c38e0..2bf0a88 100644
+--- a/src/api/types.ts
++++ b/src/api/types.ts
+@@ -36,6 +36,12 @@ export const JobSchema = BaseEntity.extend({
+   work_start_time: z.string().datetime().optional(),
+   work_end_time: z.string().datetime().optional(),
+   closeout_submitted_at: z.string().datetime().optional(),
++  technician_closeout_outcome: z.enum(['clean', 'concerns', 'problematic']).optional(),
++  technician_closeout_rating: z.number().int().min(1).max(5).nullable().optional(),
++  technician_closeout_complaint_flag: z.boolean().optional(),
++  technician_closeout_compliment_flag: z.boolean().optional(),
++  technician_closeout_notes: z.string().optional(),
++  technician_closeout_recorded_at: z.string().datetime().optional(),
+   qc_status: z.enum(['pending', 'passed', 'failed']).optional(),
+   qc_fail_reasons: z.string().optional(),
+   progress: z.number().min(0).max(100).optional(),
+diff --git a/src/lib/types/index.ts b/src/lib/types/index.ts
+index 5ee41d7..10dd678 100644
+--- a/src/lib/types/index.ts
++++ b/src/lib/types/index.ts
+@@ -46,6 +46,12 @@ export interface Job {
+   signoff_notes?: string;
+   qc_status?: 'pending' | 'passed' | 'failed';
+   qc_fail_reasons?: string;
++  technician_closeout_outcome?: 'clean' | 'concerns' | 'problematic';
++  technician_closeout_rating?: number | null;
++  technician_closeout_complaint_flag?: boolean;
++  technician_closeout_compliment_flag?: boolean;
++  technician_closeout_notes?: string;
++  technician_closeout_recorded_at?: string;
+   // Metadata
+   created_date?: string;
+   updated_date?: string;
+diff --git a/src/lib/closeoutReadinessViewModel.ts b/src/lib/closeoutReadinessViewModel.ts
+index f35be30..cb34c79 100644
+--- a/src/lib/closeoutReadinessViewModel.ts
++++ b/src/lib/closeoutReadinessViewModel.ts
+@@ -6,9 +6,16 @@ import { canTransition, type JobStatus, type UserRole } from '@/lib/jobStateMach
+ import { partitionEvidenceForRequirements, type EvidenceLike } from '@/lib/fieldEvidenceViewModel'
+ import { rollupUploadedEvidenceQc } from '@/lib/evidenceQcViewModel'
+ import type { Job } from '@/api/client'
+-/** Sections the Closeout UI can deep-link via FieldJobDetail tab setter */
+-export type CloseoutNavSection = 'overview' | 'runbook' | 'evidence' | 'comms' | 'closeout'
++import { hasTechnicianCloseoutFeedback, outcomeLabel } from '@/lib/fieldCloseoutFeedbackViewModel'
+ 
++/** Sections the Closeout UI can deep-link via FieldJobDetail tab setter */
++export type CloseoutNavSection =
++  | 'overview'
++  | 'runbook'
++  | 'evidence'
++  | 'comms'
++  | 'closeout'
++  | 'closeout_outcome'
+ 
+ export type CloseoutCheckKind = 'blocking' | 'attention' | 'info'
+ 
+@@ -64,7 +71,15 @@ export function deriveChecklistOverall(checks: CloseoutCheckItem[]): 'ready' | '
+  * `runbookComplete` should match `isRunbookComplete(job.runbook_phases)` when phases exist.
+  */
+ export function buildCloseoutReadinessSummary(input: {
+-  job: Pick<Job, 'status' | 'runbook_phases' | 'evidence_requirements' | 'signoff_signature_url'>
++  job: Pick<
++    Job,
++    | 'status'
++    | 'runbook_phases'
++    | 'evidence_requirements'
++    | 'signoff_signature_url'
++    | 'technician_closeout_outcome'
++    | 'technician_closeout_recorded_at'
++  >
+   evidence: EvidenceLike[]
+   runbookComplete: boolean
+   workSegmentOpen: boolean
+@@ -303,6 +318,21 @@ export function buildCloseoutReadinessSummary(input: {
+     appendTimerRow('pending_closeout')
+     appendEscalationRow()
+     appendQcFailedEvidenceRow()
++
++    const feedbackRecorded = hasTechnicianCloseoutFeedback(job)
++    const outcome = job.technician_closeout_outcome
++    checks.push({
++      id: 'technician_closeout_feedback',
++      label: 'Technician finish outcome',
++      detail: feedbackRecorded
++        ? `Recorded: ${outcome === 'clean' || outcome === 'concerns' || outcome === 'problematic' ? outcomeLabel(outcome) : 'On file'}. Optional rating and flags are saved on the job — you can update before submit.`
++        : 'Recommended: record how the finish went (clean / concerns / problematic) before you submit closeout — separate from customer sign-off.',
++      met: feedbackRecorded,
++      kind: 'info',
++      actionLabel: feedbackRecorded ? 'View outcome' : 'Record outcome',
++      navigateTo: 'closeout_outcome',
++    })
++
+     const ov = deriveChecklistOverall(checks)
+ 
+     let headline = 'Closeout still has must-fix items.'
+diff --git a/src/components/fieldv2/JobCloseoutSection.jsx b/src/components/fieldv2/JobCloseoutSection.jsx
+index 4eaa183..49e8419 100644
+--- a/src/components/fieldv2/JobCloseoutSection.jsx
++++ b/src/components/fieldv2/JobCloseoutSection.jsx
+@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
+ import { CheckCircle2, AlertCircle, Info, ChevronRight } from 'lucide-react';
+ import AuditTab from './AuditTab';
+ import SignoffCapture from '@/components/field/SignoffCapture';
++import JobCloseoutOutcomePanel from '@/components/fieldv2/JobCloseoutOutcomePanel';
+ import { cn } from '@/lib/utils';
+ import { deriveTimerSessionFromTimeEntries } from '@/lib/fieldJobExecutionModel';
+ import { buildCloseoutReadinessSummary } from '@/lib/closeoutReadinessViewModel';
+@@ -109,6 +110,20 @@ export default function JobCloseoutSection({
+       });
+       return;
+     }
++    if (section === 'closeout_outcome') {
++      requestAnimationFrame(() => {
++        const el = document.getElementById('closeout-technician-outcome-anchor');
++        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
++        if (el && typeof el.focus === 'function') {
++          try {
++            el.focus({ preventScroll: true });
++          } catch {
++            el.focus();
++          }
++        }
++      });
++      return;
++    }
+     onNavigateToSection?.(section);
+   };
+ 
+@@ -146,6 +161,14 @@ export default function JobCloseoutSection({
+         ) : null}
+       </div>
+ 
++      <JobCloseoutOutcomePanel
++        job={job}
++        onComplete={() => {
++          qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
++          onRefresh?.();
++        }}
++      />
++
+       {/* Sign-off is one readiness criterion, not the whole section */}
+       <div
+         id="closeout-signoff-anchor"
+diff --git a/src/lib/__tests__/closeoutReadinessViewModel.test.ts b/src/lib/__tests__/closeoutReadinessViewModel.test.ts
+index f4a0f6c..012cdd5 100644
+--- a/src/lib/__tests__/closeoutReadinessViewModel.test.ts
++++ b/src/lib/__tests__/closeoutReadinessViewModel.test.ts
+@@ -109,6 +109,32 @@ describe('closeoutReadinessViewModel', () => {
+     expect(r.overall).toBe('blocked')
+   })
+ 
++  it('pending_closeout adds info row for technician finish outcome', () => {
++    const r = buildCloseoutReadinessSummary({
++      job: { ...jobBase, status: 'pending_closeout' },
++      evidence: [],
++      runbookComplete: true,
++      workSegmentOpen: false,
++      blockers: [],
++    })
++    const row = r.checks.find((c) => c.id === 'technician_closeout_feedback')
++    expect(row?.kind).toBe('info')
++    expect(row?.navigateTo).toBe('closeout_outcome')
++    expect(row?.met).toBe(false)
++    const r2 = buildCloseoutReadinessSummary({
++      job: {
++        ...jobBase,
++        status: 'pending_closeout',
++        technician_closeout_outcome: 'clean',
++      },
++      evidence: [],
++      runbookComplete: true,
++      workSegmentOpen: false,
++      blockers: [],
++    })
++    expect(r2.checks.find((c) => c.id === 'technician_closeout_feedback')?.met).toBe(true)
++  })
++
+   it('in_progress adds QC attention when uploaded evidence has qc fail', () => {
+     const r = buildCloseoutReadinessSummary({
+       job: { ...jobBase, status: 'in_progress' },
+diff --git a/src/lib/fieldCloseoutFeedbackViewModel.ts b/src/lib/fieldCloseoutFeedbackViewModel.ts
+new file mode 100644
+index 0000000..e809614
+--- /dev/null
++++ b/src/lib/fieldCloseoutFeedbackViewModel.ts
+@@ -0,0 +1,129 @@
++/**
++ * Technician closeout outcome — job persistence slice + mapping to feedback_event (feedback_source: closeout).
++ * Outcome triad is the primary signal; complaint checkbox is an explicit add-on for customer/issue reporting.
++ */
++import type { Job } from '@/api/client'
++
++export type TechnicianCloseoutOutcome = 'clean' | 'concerns' | 'problematic'
++
++export type TechnicianCloseoutFeedbackForm = {
++  outcome: TechnicianCloseoutOutcome | null
++  rating: number | null
++  complaintFlag: boolean
++  complimentFlag: boolean
++  notes: string
++}
++
++const NOTES_MAX = 2000
++
++/** True when a technician outcome has been saved on the job. */
++export function hasTechnicianCloseoutFeedback(
++  job: Pick<Job, 'technician_closeout_outcome' | 'technician_closeout_recorded_at'>
++): boolean {
++  const o = job.technician_closeout_outcome
++  if (o === 'clean' || o === 'concerns' || o === 'problematic') return true
++  return !!job.technician_closeout_recorded_at
++}
++
++/**
++ * For feedback_event: complaint if finish was not fully clean OR technician explicitly flags a customer concern.
++ * Outcome is overall finish quality; explicit checkbox is a narrower “issue reported” signal — both may apply.
++ */
++export function complaintFlagForFeedbackEvent(
++  outcome: TechnicianCloseoutOutcome,
++  explicitComplaint: boolean
++): boolean {
++  return outcome === 'concerns' || outcome === 'problematic' || explicitComplaint
++}
++
++/** Payload for base44.entities.Job.update — call only when form.outcome is set. */
++export function buildTechnicianCloseoutJobUpdate(form: TechnicianCloseoutFeedbackForm): Record<string, unknown> {
++  if (!form.outcome) {
++    throw new Error('technician_closeout_outcome required')
++  }
++  const notes = form.notes.trim()
++  const clipped = notes.length > NOTES_MAX ? `${notes.slice(0, NOTES_MAX - 3)}...` : notes
++  const rating =
++    form.rating != null && form.rating >= 1 && form.rating <= 5 ? Math.round(form.rating) : null
++
++  return {
++    technician_closeout_outcome: form.outcome,
++    technician_closeout_rating: rating,
++    technician_closeout_complaint_flag: form.complaintFlag,
++    technician_closeout_compliment_flag: form.complimentFlag,
++    technician_closeout_notes: clipped || null,
++    technician_closeout_recorded_at: new Date().toISOString(),
++  }
++}
++
++/** Arguments for emitFeedbackEvent after a successful job update. */
++export function buildCloseoutFeedbackEventArgs(input: {
++  job: Record<string, unknown>
++  user: unknown
++  form: TechnicianCloseoutFeedbackForm
++}): {
++  job: Record<string, unknown>
++  user: unknown
++  ratingValue: number | null
++  complaintFlag: boolean
++  complimentFlag: boolean
++  feedbackNotes: string | null
++  feedbackSource: 'closeout'
++} {
++  const { job, user, form } = input
++  if (!form.outcome) {
++    throw new Error('outcome required for feedback event')
++  }
++  const ratingValue =
++    form.rating != null && form.rating >= 1 && form.rating <= 5 ? Math.round(form.rating) : null
++  const notes = form.notes.trim()
++  const feedbackNotes = notes.length > 2000 ? `${notes.slice(0, 1997)}...` : notes || null
++
++  return {
++    job,
++    user,
++    ratingValue,
++    complaintFlag: complaintFlagForFeedbackEvent(form.outcome, form.complaintFlag),
++    complimentFlag: form.complimentFlag,
++    feedbackNotes,
++    feedbackSource: 'closeout',
++  }
++}
++
++export function outcomeLabel(outcome: TechnicianCloseoutOutcome): string {
++  switch (outcome) {
++    case 'clean':
++      return 'Clean finish'
++    case 'concerns':
++      return 'Finished with concerns'
++    case 'problematic':
++      return 'Problematic finish'
++    default:
++      return outcome
++  }
++}
++
++/** Hydrate form from job row (pending_closeout re-edit). */
++export function formStateFromJob(
++  job: Pick<
++    Job,
++    | 'technician_closeout_outcome'
++    | 'technician_closeout_rating'
++    | 'technician_closeout_complaint_flag'
++    | 'technician_closeout_compliment_flag'
++    | 'technician_closeout_notes'
++  >
++): TechnicianCloseoutFeedbackForm {
++  const o = job.technician_closeout_outcome
++  const outcome =
++    o === 'clean' || o === 'concerns' || o === 'problematic' ? o : null
++  const r = job.technician_closeout_rating
++  const rating = typeof r === 'number' && r >= 1 && r <= 5 ? r : null
++  return {
++    outcome,
++    rating,
++    complaintFlag: job.technician_closeout_complaint_flag === true,
++    complimentFlag: job.technician_closeout_compliment_flag === true,
++    notes: typeof job.technician_closeout_notes === 'string' ? job.technician_closeout_notes : '',
++  }
++}
+diff --git a/src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts b/src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts
+new file mode 100644
+index 0000000..4d3d5fe
+--- /dev/null
++++ b/src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts
+@@ -0,0 +1,71 @@
++import { describe, it, expect } from 'vitest'
++import {
++  hasTechnicianCloseoutFeedback,
++  complaintFlagForFeedbackEvent,
++  buildTechnicianCloseoutJobUpdate,
++  buildCloseoutFeedbackEventArgs,
++  formStateFromJob,
++} from '../fieldCloseoutFeedbackViewModel'
++
++describe('fieldCloseoutFeedbackViewModel', () => {
++  it('hasTechnicianCloseoutFeedback', () => {
++    expect(hasTechnicianCloseoutFeedback({})).toBe(false)
++    expect(hasTechnicianCloseoutFeedback({ technician_closeout_outcome: 'clean' })).toBe(true)
++    expect(hasTechnicianCloseoutFeedback({ technician_closeout_recorded_at: '2025-01-01T00:00:00.000Z' })).toBe(
++      true
++    )
++  })
++
++  it('complaintFlagForFeedbackEvent', () => {
++    expect(complaintFlagForFeedbackEvent('clean', false)).toBe(false)
++    expect(complaintFlagForFeedbackEvent('clean', true)).toBe(true)
++    expect(complaintFlagForFeedbackEvent('concerns', false)).toBe(true)
++    expect(complaintFlagForFeedbackEvent('problematic', false)).toBe(true)
++  })
++
++  it('buildTechnicianCloseoutJobUpdate', () => {
++    const u = buildTechnicianCloseoutJobUpdate({
++      outcome: 'concerns',
++      rating: 3,
++      complaintFlag: true,
++      complimentFlag: false,
++      notes: '  hi  ',
++    })
++    expect(u.technician_closeout_outcome).toBe('concerns')
++    expect(u.technician_closeout_rating).toBe(3)
++    expect(u.technician_closeout_complaint_flag).toBe(true)
++    expect(u.technician_closeout_compliment_flag).toBe(false)
++    expect(u.technician_closeout_notes).toBe('hi')
++    expect(u.technician_closeout_recorded_at).toBeTruthy()
++  })
++
++  it('buildCloseoutFeedbackEventArgs maps complaint from outcome or explicit', () => {
++    const args = buildCloseoutFeedbackEventArgs({
++      job: { id: 'j1' },
++      user: null,
++      form: {
++        outcome: 'clean',
++        rating: null,
++        complaintFlag: true,
++        complimentFlag: false,
++        notes: '',
++      },
++    })
++    expect(args.complaintFlag).toBe(true)
++    expect(args.feedbackSource).toBe('closeout')
++  })
++
++  it('formStateFromJob', () => {
++    const f = formStateFromJob({
++      technician_closeout_outcome: 'problematic',
++      technician_closeout_rating: 2,
++      technician_closeout_complaint_flag: false,
++      technician_closeout_compliment_flag: true,
++      technician_closeout_notes: 'x',
++    })
++    expect(f.outcome).toBe('problematic')
++    expect(f.rating).toBe(2)
++    expect(f.complimentFlag).toBe(true)
++    expect(f.notes).toBe('x')
++  })
++})
+diff --git a/src/components/fieldv2/JobCloseoutOutcomePanel.jsx b/src/components/fieldv2/JobCloseoutOutcomePanel.jsx
+new file mode 100644
+index 0000000..b29bf53
+--- /dev/null
++++ b/src/components/fieldv2/JobCloseoutOutcomePanel.jsx
+@@ -0,0 +1,258 @@
++/**
++ * Technician closeout outcome — triad (clean / concerns / problematic) + optional rating, flags, notes.
++ * Persists on Job; emits feedback_event with feedback_source: closeout after successful update.
++ */
++import React, { useEffect, useState } from 'react';
++import { useMutation, useQueryClient } from '@tanstack/react-query';
++import { base44 } from '@/api/base44Client';
++import { Button } from '@/components/ui/button';
++import { Textarea } from '@/components/ui/textarea';
++import { Label } from '@/components/ui/label';
++import { Loader2, Star, ClipboardCheck } from 'lucide-react';
++import { toast } from 'sonner';
++import { cn } from '@/lib/utils';
++import { useAuth } from '@/lib/AuthContext';
++import { emitFeedbackEvent } from '@/lib/feedbackEvent';
++import {
++  buildCloseoutFeedbackEventArgs,
++  buildTechnicianCloseoutJobUpdate,
++  formStateFromJob,
++  hasTechnicianCloseoutFeedback,
++  outcomeLabel,
++} from '@/lib/fieldCloseoutFeedbackViewModel';
++import {
++  FIELD_CARD,
++  FIELD_CTRL_H,
++  FIELD_META,
++  FIELD_OVERLINE,
++  FIELD_SURFACE_MUTED,
++} from '@/lib/fieldVisualTokens';
++
++const OUTCOMES = [
++  { value: 'clean', label: 'Clean finish' },
++  { value: 'concerns', label: 'Finished with concerns' },
++  { value: 'problematic', label: 'Problematic finish' },
++];
++
++export default function JobCloseoutOutcomePanel({ job, onComplete }) {
++  const { user } = useAuth();
++  const queryClient = useQueryClient();
++  const [form, setForm] = useState(() => formStateFromJob(job));
++
++  useEffect(() => {
++    if (job.status !== 'pending_closeout') return;
++    setForm(formStateFromJob(job));
++  }, [
++    job.id,
++    job.status,
++    job.technician_closeout_outcome,
++    job.technician_closeout_recorded_at,
++    job.technician_closeout_rating,
++    job.technician_closeout_complaint_flag,
++    job.technician_closeout_compliment_flag,
++    job.technician_closeout_notes,
++  ]);
++
++  const saveMutation = useMutation({
++    mutationFn: async () => {
++      const patch = buildTechnicianCloseoutJobUpdate(form);
++      await base44.entities.Job.update(job.id, patch);
++      return patch;
++    },
++    onSuccess: async (patch) => {
++      const merged = { ...job, ...patch };
++      try {
++        await emitFeedbackEvent(
++          buildCloseoutFeedbackEventArgs({
++            job: merged,
++            user,
++            form,
++          })
++        );
++      } catch (err) {
++        console.warn('[feedback_event] enqueue failed after closeout outcome', err);
++      }
++      queryClient.invalidateQueries({ queryKey: ['jobs'] });
++      queryClient.invalidateQueries({ queryKey: ['fj-job', job.id] });
++      toast.success('Finish outcome saved');
++      onComplete?.();
++    },
++    onError: (e) => {
++      console.error(e);
++      toast.error('Could not save outcome — try again');
++    },
++  });
++
++  const readOnly =
++    job.status === 'submitted' || job.status === 'approved' || job.status === 'rejected';
++
++  if (readOnly) {
++    if (!hasTechnicianCloseoutFeedback(job)) return null;
++    const o = job.technician_closeout_outcome;
++    const title =
++      o === 'clean' || o === 'concerns' || o === 'problematic' ? outcomeLabel(o) : 'Recorded';
++    const r = job.technician_closeout_rating;
++    return (
++      <div
++        id="closeout-technician-outcome-anchor"
++        className="scroll-mt-24 outline-none rounded-lg"
++        tabIndex={-1}
++        role="region"
++        aria-label="Technician finish outcome"
++      >
++        <p className={cn(FIELD_OVERLINE, 'mb-2')}>Technician finish outcome</p>
++        <div className={cn(FIELD_CARD, 'p-4 space-y-2')}>
++          <p className="text-sm font-semibold text-slate-900">{title}</p>
++          {typeof r === 'number' && r >= 1 && r <= 5 ? (
++            <p className={cn(FIELD_META, 'flex items-center gap-1')}>
++              Rating: {r} / 5
++            </p>
++          ) : null}
++          <div className={cn(FIELD_META, 'flex flex-wrap gap-2')}>
++            {job.technician_closeout_complaint_flag ? (
++              <span className="rounded-md bg-amber-50 text-amber-900 px-2 py-0.5 text-[11px] font-semibold border border-amber-100">
++                Issue / concern flagged
++              </span>
++            ) : null}
++            {job.technician_closeout_compliment_flag ? (
++              <span className="rounded-md bg-emerald-50 text-emerald-900 px-2 py-0.5 text-[11px] font-semibold border border-emerald-100">
++                Compliment flagged
++              </span>
++            ) : null}
++          </div>
++          {job.technician_closeout_notes ? (
++            <p className={cn(FIELD_META, 'whitespace-pre-wrap')}>{job.technician_closeout_notes}</p>
++          ) : null}
++          {job.technician_closeout_recorded_at ? (
++            <p className="text-[10px] text-slate-400">Saved {job.technician_closeout_recorded_at}</p>
++          ) : null}
++        </div>
++      </div>
++    );
++  }
++
++  if (job.status !== 'pending_closeout') return null;
++
++  return (
++    <div
++      id="closeout-technician-outcome-anchor"
++      className="scroll-mt-24 outline-none rounded-lg"
++      tabIndex={-1}
++      role="region"
++      aria-label="Technician finish outcome"
++    >
++      <div className="flex items-center gap-2 mb-2">
++        <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
++          <ClipboardCheck className="h-4 w-4 text-slate-700" />
++        </div>
++        <div>
++          <p className={cn(FIELD_OVERLINE, 'mb-0')}>Technician finish outcome</p>
++          <p className={cn(FIELD_META, 'mt-0.5 leading-snug')}>
++            How the work finished on site — separate from customer sign-off. Office sees this on the job record.
++          </p>
++        </div>
++      </div>
++
++      <div className={cn(FIELD_CARD, 'p-4 space-y-4')}>
++        <div>
++          <p className="text-xs font-semibold text-slate-800 mb-2">Outcome</p>
++          <div className="flex flex-col gap-2">
++            {OUTCOMES.map(({ value, label }) => {
++              const selected = form.outcome === value;
++              return (
++                <button
++                  key={value}
++                  type="button"
++                  onClick={() => setForm((f) => ({ ...f, outcome: value }))}
++                  className={cn(
++                    'rounded-xl border-2 px-3 py-2.5 text-left text-xs font-semibold transition-colors',
++                    FIELD_CTRL_H,
++                    selected
++                      ? 'border-indigo-500 bg-indigo-50 text-indigo-950'
++                      : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
++                  )}
++                >
++                  {label}
++                </button>
++              );
++            })}
++          </div>
++        </div>
++
++        <div className="space-y-1">
++          <Label className="text-xs">Optional rating (1–5)</Label>
++          <div className="flex gap-1">
++            {[1, 2, 3, 4, 5].map((s) => (
++              <button
++                key={s}
++                type="button"
++                onClick={() =>
++                  setForm((f) => ({ ...f, rating: f.rating === s ? null : s }))
++                }
++                className="p-1"
++                aria-label={`Rate ${s} of 5`}
++              >
++                <Star
++                  className={cn(
++                    'h-6 w-6',
++                    form.rating != null && s <= form.rating
++                      ? 'text-amber-400 fill-amber-400'
++                      : 'text-slate-200'
++                  )}
++                />
++              </button>
++            ))}
++          </div>
++        </div>
++
++        <div className="space-y-2">
++          <label className="flex items-start gap-2 text-xs text-slate-800 cursor-pointer">
++            <input
++              type="checkbox"
++              className="mt-0.5 rounded border-slate-300"
++              checked={form.complaintFlag}
++              onChange={(e) => setForm((f) => ({ ...f, complaintFlag: e.target.checked }))}
++            />
++            <span>Flag customer / issue concern (adds to complaint signal for analytics)</span>
++          </label>
++          <label className="flex items-start gap-2 text-xs text-slate-800 cursor-pointer">
++            <input
++              type="checkbox"
++              className="mt-0.5 rounded border-slate-300"
++              checked={form.complimentFlag}
++              onChange={(e) => setForm((f) => ({ ...f, complimentFlag: e.target.checked }))}
++            />
++            <span>Flag compliment / positive note</span>
++          </label>
++        </div>
++
++        <div className="space-y-1">
++          <Label className="text-xs">Notes (optional)</Label>
++          <Textarea
++            value={form.notes}
++            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value.slice(0, 2000) }))}
++            placeholder="Context for the office…"
++            className="rounded-xl resize-none min-h-[72px]"
++            rows={3}
++          />
++          <p className={cn(FIELD_META, 'text-[10px]')}>{form.notes.length} / 2000</p>
++        </div>
++
++        <Button
++          className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 h-11"
++          disabled={!form.outcome || saveMutation.isPending}
++          onClick={() => saveMutation.mutate()}
++        >
++          {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
++          Save finish outcome
++        </Button>
++      </div>
++
++      {hasTechnicianCloseoutFeedback(job) ? (
++        <p className={cn(FIELD_SURFACE_MUTED, 'text-[11px] text-slate-600 mt-2 px-0.5')}>
++          Last saved on the job — you can update fields and save again before submit.
++        </p>
++      ) : null}
++    </div>
++  );
++}
+diff --git a/build-changes/README.md b/build-changes/README.md
+index 09d89ee..fe7dad7 100644
+--- a/build-changes/README.md
++++ b/build-changes/README.md
+@@ -643,6 +643,61 @@ git apply build-changes/iteration-10-qc-review-rigor.patch
+ 
+ ---
+ 
++## Iteration 11 — Technician closeout outcome & feedback
++
++**`fieldCloseoutFeedbackViewModel.ts`** owns job update payload, `feedback_event` mapping (`feedback_source: 'closeout'`, complaint flag from outcome triad and/or explicit checkbox), and hydration from the job row. **Closeout** tab: **`JobCloseoutOutcomePanel`** (after readiness card, before sign-off) with triad **clean / concerns / problematic**, optional **1–5** rating, **complaint** / **compliment** flags, **notes**; **`Job.update` first**, then **`emitFeedbackEvent`** on success; read-only summary on **submitted / approved / rejected** when data exists. **Readiness** (`pending_closeout`): **info** checklist row + **`closeout_outcome`** deep-link scroll (`closeout-technician-outcome-anchor`). **Job schema**: six optional **`technician_closeout_*`** fields in **`api/types.ts`** and **`lib/types`**. Tests: **`fieldCloseoutFeedbackViewModel.test.ts`**, extended **`closeoutReadinessViewModel.test.ts`**.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
++
++- `src/lib/fieldCloseoutFeedbackViewModel.ts`
++- `src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts`
++- `src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
++
++**Modified**
++
++- `src/api/types.ts` — `JobSchema` technician closeout fields
++- `src/lib/types/index.ts` — `Job` interface
++- `src/lib/closeoutReadinessViewModel.ts` — `CloseoutNavSection`, info row
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++- `src/components/fieldv2/JobCloseoutSection.jsx` — panel + `closeout_outcome` scroll
++
++### Patch
++
++**[`iteration-11-outcome-feedback.patch`](./iteration-11-outcome-feedback.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/api/types.ts \
++    src/lib/types/index.ts \
++    src/lib/closeoutReadinessViewModel.ts \
++    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
++    src/components/fieldv2/JobCloseoutSection.jsx
++  git diff --no-index /dev/null src/lib/fieldCloseoutFeedbackViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/JobCloseoutOutcomePanel.jsx || true
++} > build-changes/iteration-11-outcome-feedback.patch
++```
++
++Once the **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/fieldCloseoutFeedbackViewModel.ts src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–10 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-11-outcome-feedback.patch
++git apply build-changes/iteration-11-outcome-feedback.patch
++```
++
++---
++
+ ## Adding future iterations
+ 
+ 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).

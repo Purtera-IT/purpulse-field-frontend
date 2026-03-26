@@ -1,0 +1,98 @@
+diff --git a/src/components/fieldv2/JobCloseoutOutcomePanel.jsx b/src/components/fieldv2/JobCloseoutOutcomePanel.jsx
+index b29bf53..79b784d 100644
+--- a/src/components/fieldv2/JobCloseoutOutcomePanel.jsx
++++ b/src/components/fieldv2/JobCloseoutOutcomePanel.jsx
+@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
+ import { Textarea } from '@/components/ui/textarea';
+ import { Label } from '@/components/ui/label';
+ import { Loader2, Star, ClipboardCheck } from 'lucide-react';
++import { format, isValid, parseISO } from 'date-fns';
+ import { toast } from 'sonner';
+ import { cn } from '@/lib/utils';
+ import { useAuth } from '@/lib/AuthContext';
+@@ -20,13 +21,17 @@ import {
+   hasTechnicianCloseoutFeedback,
+   outcomeLabel,
+ } from '@/lib/fieldCloseoutFeedbackViewModel';
+-import {
+-  FIELD_CARD,
+-  FIELD_CTRL_H,
+-  FIELD_META,
+-  FIELD_OVERLINE,
+-  FIELD_SURFACE_MUTED,
+-} from '@/lib/fieldVisualTokens';
++import { FIELD_CARD, FIELD_META, FIELD_OVERLINE, FIELD_SURFACE_MUTED } from '@/lib/fieldVisualTokens';
++
++function formatRecordedAt(iso) {
++  if (!iso || typeof iso !== 'string') return null;
++  try {
++    const d = parseISO(iso);
++    return isValid(d) ? format(d, 'MMM d, yyyy · h:mm a') : iso;
++  } catch {
++    return iso;
++  }
++}
+ 
+ const OUTCOMES = [
+   { value: 'clean', label: 'Clean finish' },
+@@ -124,7 +129,9 @@ export default function JobCloseoutOutcomePanel({ job, onComplete }) {
+             <p className={cn(FIELD_META, 'whitespace-pre-wrap')}>{job.technician_closeout_notes}</p>
+           ) : null}
+           {job.technician_closeout_recorded_at ? (
+-            <p className="text-[10px] text-slate-400">Saved {job.technician_closeout_recorded_at}</p>
++            <p className="text-[10px] text-slate-400">
++              Saved {formatRecordedAt(job.technician_closeout_recorded_at) ?? job.technician_closeout_recorded_at}
++            </p>
+           ) : null}
+         </div>
+       </div>
+@@ -148,7 +155,7 @@ export default function JobCloseoutOutcomePanel({ job, onComplete }) {
+         <div>
+           <p className={cn(FIELD_OVERLINE, 'mb-0')}>Technician finish outcome</p>
+           <p className={cn(FIELD_META, 'mt-0.5 leading-snug')}>
+-            How the work finished on site — separate from customer sign-off. Office sees this on the job record.
++            How the work finished on site — separate from customer sign-off. Saved to the job record for operations.
+           </p>
+         </div>
+       </div>
+@@ -166,7 +173,6 @@ export default function JobCloseoutOutcomePanel({ job, onComplete }) {
+                   onClick={() => setForm((f) => ({ ...f, outcome: value }))}
+                   className={cn(
+                     'rounded-xl border-2 px-3 py-2.5 text-left text-xs font-semibold transition-colors',
+-                    FIELD_CTRL_H,
+                     selected
+                       ? 'border-indigo-500 bg-indigo-50 text-indigo-950'
+                       : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+@@ -213,7 +219,7 @@ export default function JobCloseoutOutcomePanel({ job, onComplete }) {
+               checked={form.complaintFlag}
+               onChange={(e) => setForm((f) => ({ ...f, complaintFlag: e.target.checked }))}
+             />
+-            <span>Flag customer / issue concern (adds to complaint signal for analytics)</span>
++            <span>Flag customer or site concern</span>
+           </label>
+           <label className="flex items-start gap-2 text-xs text-slate-800 cursor-pointer">
+             <input
+@@ -231,7 +237,7 @@ export default function JobCloseoutOutcomePanel({ job, onComplete }) {
+           <Textarea
+             value={form.notes}
+             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value.slice(0, 2000) }))}
+-            placeholder="Context for the office…"
++            placeholder="Context for operations…"
+             className="rounded-xl resize-none min-h-[72px]"
+             rows={3}
+           />
+diff --git a/src/lib/closeoutReadinessViewModel.ts b/src/lib/closeoutReadinessViewModel.ts
+index cb34c79..5bc718a 100644
+--- a/src/lib/closeoutReadinessViewModel.ts
++++ b/src/lib/closeoutReadinessViewModel.ts
+@@ -325,8 +325,8 @@ export function buildCloseoutReadinessSummary(input: {
+       id: 'technician_closeout_feedback',
+       label: 'Technician finish outcome',
+       detail: feedbackRecorded
+-        ? `Recorded: ${outcome === 'clean' || outcome === 'concerns' || outcome === 'problematic' ? outcomeLabel(outcome) : 'On file'}. Optional rating and flags are saved on the job — you can update before submit.`
+-        : 'Recommended: record how the finish went (clean / concerns / problematic) before you submit closeout — separate from customer sign-off.',
++        ? `Informational — recorded: ${outcome === 'clean' || outcome === 'concerns' || outcome === 'problematic' ? outcomeLabel(outcome) : 'on file'}. Optional rating and flags are saved on the job; you can update before submit.`
++        : 'Informational — recommended, not required to submit: record how the finish went (clean / concerns / problematic) for operations, separate from customer sign-off. Does not block handoff.',
+       met: feedbackRecorded,
+       kind: 'info',
+       actionLabel: feedbackRecorded ? 'View outcome' : 'Record outcome',

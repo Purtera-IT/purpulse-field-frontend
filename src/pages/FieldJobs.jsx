@@ -73,7 +73,7 @@ function JobCard({ job }) {
           <StatusBadge status={job.status} />
         </div>
         <p className="text-xs text-slate-400 truncate mb-1.5">{job.project_name || job.site_name || '—'}</p>
-        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 text-[11px] flex-wrap">
           <span className={cn('inline-flex items-center gap-1.5', prio.text)}>
             <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', prio.dot)} aria-hidden />
             {prio.label}
@@ -135,8 +135,11 @@ export default function FieldJobs() {
           <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
             {FILTER_CHIPS.map(s => (
               <button key={s} onClick={() => setStatusF(s)}
-                className={cn('flex-shrink-0 h-7 px-3 rounded-full text-[11px] font-bold transition-colors capitalize',
-                  statusF === s ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                className={cn(
+                  'flex-shrink-0 h-7 px-3 rounded-full text-[11px] font-bold transition-colors capitalize border',
+                  statusF === s
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 )}>
                 {s === 'all' ? `All (${jobs.length})` : (FIELD_JOB_STATUS_DISPLAY[s]?.label ?? s)}
                 {s !== 'all' && (

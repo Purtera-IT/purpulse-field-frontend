@@ -330,8 +330,8 @@ Shared **Tailwind class tokens** (`fieldVisualTokens`) and a small **`FieldSecti
 | -------- | ---- |
 | **`FIELD_MAX_WIDTH`**, **`FIELD_PAGE_PAD_X`**, **`FIELD_PAGE_PAD_Y`** | Page column width and padding (aligned list + detail). |
 | **`FIELD_STACK_GAP`**, **`FIELD_INNER_STACK`** | Vertical rhythm between major sections vs inside cards. |
-| **`FIELD_OVERLINE`**, **`FIELD_OVERLINE_STRONG`** | Section eyebrows (10px, uppercase, slate). |
-| **`FIELD_SECTION_TITLE`**, **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | In-card titles, body, secondary lines, mono IDs. |
+| **`FIELD_OVERLINE`** | Section eyebrows (10px, uppercase, slate). |
+| **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | Body, secondary lines, mono IDs. |
 | **`FIELD_CARD`**, **`FIELD_CARD_HEADER`**, **`FIELD_CARD_BODY`** | Default white card shell + titled header band + body padding. |
 | **`FIELD_SURFACE_MUTED`**, **`FIELD_SURFACE_WARNING`** | Secondary dashed panels; escalation / strong attention (amber). |
 | **`BTN_PRIMARY`**, **`BTN_SECONDARY`**, **`BTN_DANGER`** | Named CTA fragments (slate / outline / red). |
@@ -411,7 +411,11 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
 
 `git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
 
-### Deferred / Iteration 7 ideas
+### Iteration 6.1 (small cleanup, same canonical scope)
+
+- Dropped unused **`FIELD_OVERLINE_STRONG`** / **`FIELD_SECTION_TITLE`** tokens; tightened **JobOverview** and **PreJobToolCheckModal** operator copy; **FieldJobs** filter chips use bordered inactive state for contrast; **Evidence** thumbnails use slightly calmer QC/record overlays.
+
+### Deferred (Iteration 9+)
 
 - Global theme, dark mode, animation polish, legacy pages.
 - **`fj-blockers`** strip on job detail + read-only open escalations in Comms.
@@ -419,7 +423,513 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
 
 ---
 
+## Iteration 7 — Readiness + acknowledgement rigor (canonical path)
+
+Honest **Route → Start work → Work timer** readiness on **Overview** (`buildFieldReadinessSummary`), shared **`READINESS_SHORT_LINES`** for header next-step copy, lifecycle/timer framing, pre-job dialog outside-dismiss prevention, acknowledgement sheet operator copy. **No** shell, telemetry/Azure, or new job schema fields.
+
+Longer context: **[`iteration-7-readiness-rigor.md`](./iteration-7-readiness-rigor.md)**.
+
+### Changed file list
+
+**New** (use **`git diff --no-index`** below while these paths are **untracked**; once committed, fold them into **`git diff HEAD --`** only)
+
+- `src/lib/fieldReadinessViewModel.ts`
+- `src/lib/__tests__/fieldReadinessViewModel.test.ts`
+- `src/components/fieldv2/ReadinessSummaryCard.jsx`
+
+**Modified**
+
+- `src/components/fieldv2/JobOverview.jsx`
+- `src/components/fieldv2/jobExecutionNextStep.js`
+- `src/components/fieldv2/JobStateTransitioner.jsx`
+- `src/components/fieldv2/FieldTimeTracker.jsx`
+- `src/components/fieldv2/PreJobToolCheckModal.jsx`
+- `src/components/field/AcknowledgementSheets.jsx`
+
+### Patch
+
+**[`iteration-7-readiness-rigor.patch`](./iteration-7-readiness-rigor.patch)**
+
+Re-run from the **repository root** to refresh ( **`git diff --no-index`** exits **1** when there are changes — append with **`|| true`** or run in a subshell):
+
+```bash
+{
+  git diff HEAD -- \
+    src/components/fieldv2/JobOverview.jsx \
+    src/components/fieldv2/jobExecutionNextStep.js \
+    src/components/fieldv2/JobStateTransitioner.jsx \
+    src/components/fieldv2/FieldTimeTracker.jsx \
+    src/components/fieldv2/PreJobToolCheckModal.jsx \
+    src/components/field/AcknowledgementSheets.jsx
+  git diff --no-index /dev/null src/lib/fieldReadinessViewModel.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/fieldReadinessViewModel.test.ts || true
+  git diff --no-index /dev/null src/components/fieldv2/ReadinessSummaryCard.jsx || true
+} > build-changes/iteration-7-readiness-rigor.patch
+```
+
+Once the three **new** files are **tracked**, replace the three **`--no-index`** lines with:
+
+`git diff HEAD -- src/lib/fieldReadinessViewModel.ts src/lib/__tests__/fieldReadinessViewModel.test.ts src/components/fieldv2/ReadinessSummaryCard.jsx`
+
+and merge into a single **`git diff HEAD -- …`** block.
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–6 (or equivalent):
+
+```bash
+git apply --check build-changes/iteration-7-readiness-rigor.patch
+git apply build-changes/iteration-7-readiness-rigor.patch
+```
+
+`git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
+
+---
+
+## Iteration 8 — Runbook execution rigor (canonical path)
+
+Canonical **Runbook** tab is driven **only** by **`job.runbook_phases`** (no template list). Real **progress** from job-backed steps; **pass/fail** persists via **`mergeRunbookStepOutcome`** + **`base44.entities.Job.update`** after **`emitRunbookStepEvent`**, aligned with **[`RunbookView.jsx`](../src/components/field/RunbookView.jsx)** (`completed` + `result` including **`fail`** for legacy display). **Session-only** “Running” until complete/fail; **phase gating** matches RunbookView; **evidence** row shows linked count or **None linked**; failed steps link to **Comms**; **closeout** banner when runbook incomplete. **`runbookExecutionViewModel.ts`** holds pure ordering/gating/progress/merge helpers.
+
+### Changed file list
+
+**New** (use **`git diff --no-index`** below while **untracked**; once committed, use **`git diff HEAD --`** for those paths only)
+
+- `src/lib/runbookExecutionViewModel.ts`
+- `src/lib/__tests__/runbookExecutionViewModel.test.ts`
+
+**Modified**
+
+- `src/components/fieldv2/RunbookSteps.jsx`
+- `src/pages/FieldJobDetail.jsx`
+- `src/components/field/RunbookView.jsx` — **`RESULT_CFG.fail`** + **`stepResult`** handles **`result: 'fail'`** (fieldv2 persistence alignment)
+
+### Patch
+
+**[`iteration-8-runbook-rigor.patch`](./iteration-8-runbook-rigor.patch)**
+
+Re-run from the **repository root** to refresh:
+
+```bash
+{
+  git diff HEAD -- \
+    src/components/field/RunbookView.jsx \
+    src/components/fieldv2/RunbookSteps.jsx \
+    src/pages/FieldJobDetail.jsx
+  git diff --no-index /dev/null src/lib/runbookExecutionViewModel.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/runbookExecutionViewModel.test.ts || true
+} > build-changes/iteration-8-runbook-rigor.patch
+```
+
+Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
+
+`git diff HEAD -- src/lib/runbookExecutionViewModel.ts src/lib/__tests__/runbookExecutionViewModel.test.ts`
+
+and merge into one **`git diff HEAD -- …`** block.
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–7 (or equivalent):
+
+```bash
+git apply --check build-changes/iteration-8-runbook-rigor.patch
+git apply build-changes/iteration-8-runbook-rigor.patch
+```
+
+`git apply --check` only succeeds when the **pre-patch** tree matches the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
+
+---
+
+## Iteration 9 — Closeout rigor & completion gating (canonical path)
+
+Closeout is an **operational checkpoint**: explicit **readiness summary** (`ready` / `blocked` / `review_suggested` for checklist-derived states), a **truthful checklist** tied to `canTransition` (work-complete + submit gates), **`job.evidence_requirements`** via `partitionEvidenceForRequirements`, **runbook** state, **sign-off** as one row (not the whole tab), **timer** (`workSegmentOpen`) and **Blocker** records (open/acknowledged ≠ resolved). **Action links** jump to Runbook, Evidence, Comms, Overview, or focus/scroll to sign-off. **Audit** stays secondary. **Job state → Complete work** copy nudges technicians to check Closeout first (no new backend lockouts).
+
+**Technical debt:** `FieldJobDetail` still loads blockers via `base44.entities.Blocker.filter` — should move behind `apiClient` / `jobRepository` when you add a canonical API path (keep `['blockers', jobId]` in sync with `BlockerForm`).
+
+### Changed file list
+
+**New** (use **`git diff --no-index`** below while **untracked**; once committed, fold into **`git diff HEAD --`**)
+
+- `src/lib/closeoutReadinessViewModel.ts`
+- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
+
+**Modified**
+
+- `src/components/fieldv2/JobCloseoutSection.jsx`
+- `src/pages/FieldJobDetail.jsx` — `blockers` query (`base44.entities.Blocker.filter`), invalidate, props to Closeout
+- `src/components/fieldv2/JobStateTransitioner.jsx` — Closeout checklist hint on **Complete work**
+
+### Patch
+
+**[`iteration-9-closeout-rigor.patch`](./iteration-9-closeout-rigor.patch)**
+
+Re-run from the **repository root** to refresh:
+
+```bash
+{
+  git diff HEAD -- \
+    src/components/fieldv2/JobCloseoutSection.jsx \
+    src/pages/FieldJobDetail.jsx \
+    src/components/fieldv2/JobStateTransitioner.jsx
+  git diff --no-index /dev/null src/lib/closeoutReadinessViewModel.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/closeoutReadinessViewModel.test.ts || true
+} > build-changes/iteration-9-closeout-rigor.patch
+```
+
+Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
+
+`git diff HEAD -- src/lib/closeoutReadinessViewModel.ts src/lib/__tests__/closeoutReadinessViewModel.test.ts`
+
+and merge into one **`git diff HEAD -- …`** block.
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–8 (or equivalent):
+
+```bash
+git apply --check build-changes/iteration-9-closeout-rigor.patch
+git apply build-changes/iteration-9-closeout-rigor.patch
+```
+
+---
+
+## Iteration 10 — QC & review-loop rigor (canonical Evidence path)
+
+**`evidenceQcViewModel.ts`** normalizes `qc_status` strings (`pass` / `passed` / `approved`, `fail` / `rejected`, etc.) into **pass | fail | pending**, rolls up counts for **uploaded** files only, and drives presentation copy. **Evidence** tab: **QC on saved files** summary strip (tight copy: saved vs QC outcome), **PASS | FAIL | REVIEW** pills on thumbnails (pending = review not recorded), **geo** pin top-right and **QC** pill bottom-right to reduce overlay clutter, section headers show **QC fail** counts when relevant, detail modal separates **file on job** vs **QC** with **Mark QC pass/fail**, failed-QC **replacement** CTA, and metadata rows. **Closeout** (`in_progress` + `pending_closeout`): **attention** row when any uploaded evidence is **QC fail** — operational wording (“may need replacement”), no backend lockout. Tests: `evidenceQcViewModel.test.ts`, extended `closeoutReadinessViewModel.test.ts`.
+
+### Changed file list
+
+**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
+
+- `src/lib/evidenceQcViewModel.ts`
+- `src/lib/__tests__/evidenceQcViewModel.test.ts`
+
+**Modified**
+
+- `src/components/fieldv2/EvidenceGalleryView.jsx`
+- `src/lib/fieldEvidenceViewModel.ts` — `qc_status` on `EvidenceLike`
+- `src/lib/closeoutReadinessViewModel.ts` — QC-fail evidence attention row
+- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
+
+### Patch
+
+**[`iteration-10-qc-review-rigor.patch`](./iteration-10-qc-review-rigor.patch)**
+
+Re-run from the **repository root** to refresh:
+
+```bash
+{
+  git diff HEAD -- \
+    src/lib/fieldEvidenceViewModel.ts \
+    src/lib/closeoutReadinessViewModel.ts \
+    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
+    src/components/fieldv2/EvidenceGalleryView.jsx
+  git diff --no-index /dev/null src/lib/evidenceQcViewModel.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/evidenceQcViewModel.test.ts || true
+} > build-changes/iteration-10-qc-review-rigor.patch
+```
+
+Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
+
+`git diff HEAD -- src/lib/evidenceQcViewModel.ts src/lib/__tests__/evidenceQcViewModel.test.ts`
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–9 (or equivalent):
+
+```bash
+git apply --check build-changes/iteration-10-qc-review-rigor.patch
+git apply build-changes/iteration-10-qc-review-rigor.patch
+```
+
+---
+
+## Iteration 11 — Technician closeout outcome & feedback
+
+**`fieldCloseoutFeedbackViewModel.ts`** owns job update payload, `feedback_event` mapping (`feedback_source: 'closeout'`, complaint flag from outcome triad and/or explicit checkbox), and hydration from the job row. **Closeout** tab: **`JobCloseoutOutcomePanel`** (after readiness card, before sign-off) with triad **clean / concerns / problematic**, optional **1–5** rating, **complaint** / **compliment** flags, **notes**; **`Job.update` first**, then **`emitFeedbackEvent`** on success; read-only summary on **submitted / approved / rejected** when data exists. **Readiness** (`pending_closeout`): **info** checklist row + **`closeout_outcome`** deep-link scroll (`closeout-technician-outcome-anchor`). **Job schema**: six optional **`technician_closeout_*`** fields in **`api/types.ts`** and **`lib/types`**. Tests: **`fieldCloseoutFeedbackViewModel.test.ts`**, extended **`closeoutReadinessViewModel.test.ts`**.
+
+### Changed file list
+
+**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
+
+- `src/lib/fieldCloseoutFeedbackViewModel.ts`
+- `src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts`
+- `src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
+
+**Modified**
+
+- `src/api/types.ts` — `JobSchema` technician closeout fields
+- `src/lib/types/index.ts` — `Job` interface
+- `src/lib/closeoutReadinessViewModel.ts` — `CloseoutNavSection`, info row
+- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
+- `src/components/fieldv2/JobCloseoutSection.jsx` — panel + `closeout_outcome` scroll
+
+### Patch
+
+**[`iteration-11-outcome-feedback.patch`](./iteration-11-outcome-feedback.patch)**
+
+Re-run from the **repository root** to refresh:
+
+```bash
+{
+  git diff HEAD -- \
+    src/api/types.ts \
+    src/lib/types/index.ts \
+    src/lib/closeoutReadinessViewModel.ts \
+    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
+    src/components/fieldv2/JobCloseoutSection.jsx
+  git diff --no-index /dev/null src/lib/fieldCloseoutFeedbackViewModel.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts || true
+  git diff --no-index /dev/null src/components/fieldv2/JobCloseoutOutcomePanel.jsx || true
+} > build-changes/iteration-11-outcome-feedback.patch
+```
+
+Once the **new** files are **tracked**, replace the **`--no-index`** lines with:
+
+`git diff HEAD -- src/lib/fieldCloseoutFeedbackViewModel.ts src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–10 (or equivalent):
+
+```bash
+git apply --check build-changes/iteration-11-outcome-feedback.patch
+git apply build-changes/iteration-11-outcome-feedback.patch
+```
+
+### Iteration 11.1 — Closeout outcome polish (after 11)
+
+Small UX copy and presentation pass: triad buttons drop **`FIELD_CTRL_H`** for natural vertical sizing; checkbox and intro copy are operator-facing; read-only **saved** time uses **`date-fns`** (`MMM d, yyyy · h:mm a`, aligned with other field timestamps); readiness row copy is explicitly **informational** (recommended / not required to submit / does not block handoff).
+
+**Patch:** [`iteration-11.1-closeout-outcome-polish.patch`](./iteration-11.1-closeout-outcome-polish.patch) — apply after Iteration 11.
+
+```bash
+git apply --check build-changes/iteration-11.1-closeout-outcome-polish.patch
+git apply build-changes/iteration-11.1-closeout-outcome-polish.patch
+```
+
+---
+
+## Iteration 12 — Job context snapshot rigor (canonical field path)
+
+**`jobContextField.js`:** explicit **`extractJobContextFingerprintMaterial`** + **`buildRunbookStructureKey`**; fingerprint **`JOB_CONTEXT_SCHEMA_VERSION` `1.2.0`** — adds **`project_id` / `site_id`** and sorted phase:step **`rb_sig`**; drops noisy **`updated_date`**; module doc lists fingerprint vs payload. **`emitJobContextFieldIfChanged`** chains concurrent work per **`job_id`**. **[`FieldJobDetail.jsx`](../src/pages/FieldJobDetail.jsx):** `job` / `user` via refs; **`useEffect`** deps **`jobId` + `contextDedupeKey` + `techKey`** only (no refetch churn). Tests: **`fieldJobContextSnapshot.test.ts`**.
+
+### Changed file list
+
+**New**
+
+- `src/lib/__tests__/fieldJobContextSnapshot.test.ts`
+
+**Modified**
+
+- `src/lib/jobContextField.js`
+- `src/pages/FieldJobDetail.jsx`
+- `docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md` (job context fingerprint description)
+
+### Patch
+
+**[`iteration-12-job-context-rigor.patch`](./iteration-12-job-context-rigor.patch)**
+
+Re-run from the **repository root** to refresh:
+
+```bash
+{
+  git diff HEAD -- \
+    src/lib/jobContextField.js \
+    src/pages/FieldJobDetail.jsx \
+    docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md \
+    build-changes/README.md
+  git diff --no-index /dev/null src/lib/__tests__/fieldJobContextSnapshot.test.ts || true
+} > build-changes/iteration-12-job-context-rigor.patch
+```
+
+Once the **new** test file is **tracked**, replace the **`--no-index`** line with:
+
+`git diff HEAD -- src/lib/__tests__/fieldJobContextSnapshot.test.ts`
+
+### How to use the patch
+
+From the **repository root**, apply **after** Iterations 1–11 (and 11.1 if used):
+
+```bash
+git apply --check build-changes/iteration-12-job-context-rigor.patch
+git apply build-changes/iteration-12-job-context-rigor.patch
+```
+
+### Iteration 12.1 — Job context polish (after 12)
+
+Documents **blockers query / closeout props** on FieldJobDetail as **carry-through**, not Iteration 12 `job_context_field` scope. **`normalizeJobContextLinkId`** shared by fingerprint material and **`buildJobContextFieldPayload`** so **`project_id` / `site_id`** match dedupe and outbound **`job_context_field`** (Azure schema). Module note: when fingerprint inputs change, bump **`JOB_CONTEXT_SCHEMA_VERSION`**, tests, and planning docs together. **`buildRunbookStructureKey`** comment clarifies index fallback stability.
+
+**Modified:** `src/lib/jobContextField.js`, `src/pages/FieldJobDetail.jsx`, `src/lib/__tests__/fieldJobContextSnapshot.test.ts`, `docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md`, `build-changes/README.md`.
+
+**Patch:** [`iteration-12.1-job-context-polish.patch`](./iteration-12.1-job-context-polish.patch) — apply after Iteration 12.
+
+Re-generate from repo root:
+
+```bash
+{
+  git diff HEAD -- \
+    src/lib/jobContextField.js \
+    src/pages/FieldJobDetail.jsx \
+    src/lib/__tests__/fieldJobContextSnapshot.test.ts \
+    docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
+  # plus README hunk for this subsection only (see Iteration 11 README regen pattern)
+} > build-changes/iteration-12.1-job-context-polish.patch
+```
+
+```bash
+git apply --check build-changes/iteration-12.1-job-context-polish.patch
+git apply build-changes/iteration-12.1-job-context-polish.patch
+```
+
+---
+
+## Iteration 13 — Offline / outbox consolidation + sync-state rigor
+
+**Presentation:** [`fieldJobSyncPresentation.ts`](../src/lib/fieldJobSyncPresentation.ts) — shared operator labels for Dexie **queuedEdits**, in-memory **`UploadQueueManager`** (not Dexie `uploadQueue` in jobRepository), and telemetry backlog wording; **`summarizeJobSyncSurface`** drives the job-level summary line.
+
+**Telemetry:** [`getTelemetryQueueDepthForJob`](../src/lib/telemetryQueue.js) — read-only job-scoped depth over `loadAllRows()` (string-matched `envelope.job_id`); **no** flush/backoff changes.
+
+**UI:** [`FieldJobSyncStrip.jsx`](../src/components/fieldv2/FieldJobSyncStrip.jsx) polls ~1.5s, nests [`OfflineEditsIndicator`](../src/components/fieldv2/OfflineEditsIndicator.jsx) + [`UploadProgressIndicator`](../src/components/fieldv2/UploadProgressIndicator.jsx) with **`nested`** styling; [`FieldJobDetail.jsx`](../src/pages/FieldJobDetail.jsx) uses the strip instead of stacking indicators alone. Optional phrase alignment: [`EvidenceGalleryView.jsx`](../src/components/fieldv2/EvidenceGalleryView.jsx) **`EVIDENCE_IN_FLIGHT_PHRASE`**.
+
+**Tests:** [`fieldJobSyncPresentation.test.ts`](../src/lib/__tests__/fieldJobSyncPresentation.test.ts); [`iteration13TelemetryQueue.test.js`](../src/tests/iteration13TelemetryQueue.test.js) adds **`getTelemetryQueueDepthForJob`** cases (existing flush/durability tests unchanged).
+
+### Changed file list
+
+**New**
+
+- `src/lib/fieldJobSyncPresentation.ts`
+- `src/lib/__tests__/fieldJobSyncPresentation.test.ts`
+- `src/components/fieldv2/FieldJobSyncStrip.jsx`
+
+**Modified**
+
+- `src/lib/telemetryQueue.js`
+- `src/tests/iteration13TelemetryQueue.test.js`
+- `src/components/fieldv2/OfflineEditsIndicator.jsx`
+- `src/components/fieldv2/UploadProgressIndicator.jsx`
+- `src/pages/FieldJobDetail.jsx`
+- `src/components/fieldv2/EvidenceGalleryView.jsx` (optional copy)
+- `build-changes/README.md`
+
+### Patch
+
+**[`iteration-13-sync-outbox-rigor.patch`](./iteration-13-sync-outbox-rigor.patch)**
+
+Re-generate from the **repository root** (after Iteration 13 files are present):
+
+```bash
+{
+  git diff HEAD -- \
+    src/lib/telemetryQueue.js \
+    src/tests/iteration13TelemetryQueue.test.js \
+    src/components/fieldv2/OfflineEditsIndicator.jsx \
+    src/components/fieldv2/UploadProgressIndicator.jsx
+  git diff --no-index /dev/null src/lib/fieldJobSyncPresentation.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/fieldJobSyncPresentation.test.ts || true
+  git diff --no-index /dev/null src/components/fieldv2/FieldJobSyncStrip.jsx || true
+} > build-changes/iteration-13-sync-outbox-rigor.patch
+```
+
+Then append the **`FieldJobDetail.jsx`** and **`EvidenceGalleryView.jsx`** hunks from this README’s committed patch (or re-apply manually) if your tree already diverged from the Iteration 13 base.
+
+### How to use the patch
+
+From the **repository root**, apply **after** prior iteration patches your branch uses:
+
+```bash
+git apply --check build-changes/iteration-13-sync-outbox-rigor.patch
+git apply build-changes/iteration-13-sync-outbox-rigor.patch
+```
+
+### Iteration 13.1 — Sync strip polish (after 13)
+
+Small follow-up: **document** that `FieldJobSyncStrip` interval polling of Dexie + upload manager + telemetry is **provisional** (prefer subscription-driven updates later). **Wording:** completed upload sessions use **“Upload finished”** (not “file sent”) so operators do not read it as full evidence/QC/server completeness. **Layout:** summary line uses `min-w-0`, `break-words`, and `text-pretty` for narrow viewports.
+
+**Modified:** `src/components/fieldv2/FieldJobSyncStrip.jsx`, `src/lib/fieldJobSyncPresentation.ts`, `src/components/fieldv2/UploadProgressIndicator.jsx`, `src/lib/__tests__/fieldJobSyncPresentation.test.ts`, `build-changes/README.md`.
+
+---
+
+## Iteration 14 — Canonical event-family hardening + emit-before-mutate audit
+
+**Coverage map:** [`canonicalFieldEventCoverage.ts`](../src/lib/canonicalFieldEventCoverage.ts) + [`canonicalFieldEventCoverage.test.ts`](../src/lib/__tests__/canonicalFieldEventCoverage.test.ts) — all 11 Iteration 14 families mapped to emitter modules.
+
+**Closeout flags:** [`closeoutSubmissionFlags.ts`](../src/lib/closeoutSubmissionFlags.ts) + tests — shared with legacy [`CloseoutPreview.jsx`](../src/components/field/CloseoutPreview.jsx) and v2 submit.
+
+**V2 submit (`pending_closeout` → `submitted`):** [`jobStateTransitionMutation.ts`](../src/lib/jobStateTransitionMutation.ts) — **`emitCloseoutEvent`** → **`emitDispatchEventForJobStatusChange`** → **`Job.update`** (same `closeout_submitted_at` as closeout payload). Wired from [`JobStateTransitioner.jsx`](../src/components/fieldv2/JobStateTransitioner.jsx).
+
+**Technician finish outcome:** [`technicianCloseoutOutcomeSave.ts`](../src/lib/technicianCloseoutOutcomeSave.ts) — **`emitFeedbackEvent`** before **`Job.update`**; [`JobCloseoutOutcomePanel.jsx`](../src/components/fieldv2/JobCloseoutOutcomePanel.jsx). [`fieldCloseoutFeedbackViewModel.ts`](../src/lib/fieldCloseoutFeedbackViewModel.ts) — optional **`recordedAtIso`** on **`buildTechnicianCloseoutJobUpdate`**.
+
+**Escalation:** [`BlockerForm.jsx`](../src/components/field/BlockerForm.jsx) — **`emitEscalationEvent`** before **`Blocker.create`** (`escalation_record_id` omitted until a post-create follow-up exists); honest toast if create fails after enqueue.
+
+**Explicit non-changes:** No rewrite of [`telemetryQueue.js`](../src/lib/telemetryQueue.js); artifact/QC remain post-persist emit; travel/arrival on FieldJobDetail overview remains a product follow-up (documented in coverage map).
+
+### Iteration 14.1 — Documentation cleanup (after 14)
+
+- **[`canonicalFieldEventCoverage.ts`](../src/lib/canonicalFieldEventCoverage.ts)** — File header states explicitly that the registry is **not** runtime source of truth (no routing / emission logic); `travel` row calls out **incomplete canonical v2** coverage and points to a travel/arrival lifecycle follow-up (recommended **Iteration 15**).
+- **[`artifactEvent.js`](../src/lib/artifactEvent.js)** — `fetchJobContextForArtifactEvent` JSDoc notes cross-family reuse and **TECHNICAL_DEBT** for a neutral alias name if reuse grows.
+- **[`jobStateTransitionMutation.ts`](../src/lib/jobStateTransitionMutation.ts)** — Inline note where that helper enriches closeout payloads.
+- **[`technicianCloseoutOutcomeSave.ts`](../src/lib/technicianCloseoutOutcomeSave.ts)** + **[`fieldCloseoutFeedbackViewModel.ts`](../src/lib/fieldCloseoutFeedbackViewModel.ts)** — Explicit **intentional** emit-before-persist for technician feedback (do not flip casually).
+
+### Changed file list
+
+**New**
+
+- `src/lib/canonicalFieldEventCoverage.ts`
+- `src/lib/__tests__/canonicalFieldEventCoverage.test.ts`
+- `src/lib/closeoutSubmissionFlags.ts`
+- `src/lib/__tests__/closeoutSubmissionFlags.test.ts`
+- `src/lib/jobStateTransitionMutation.ts`
+- `src/lib/__tests__/jobStateTransitionMutation.test.ts`
+- `src/lib/technicianCloseoutOutcomeSave.ts`
+- `src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts`
+
+**Modified**
+
+- `src/components/fieldv2/JobStateTransitioner.jsx`
+- `src/components/field/CloseoutPreview.jsx`
+- `src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
+- `src/components/field/BlockerForm.jsx`
+- `src/lib/fieldCloseoutFeedbackViewModel.ts`
+- `build-changes/README.md`
+
+### Patch
+
+**[`iteration-14-canonical-events.patch`](./iteration-14-canonical-events.patch)**
+
+Re-generate from the **repository root** (adjust `git diff HEAD` vs `git diff --no-index /dev/null` depending on what is already tracked):
+
+```bash
+{
+  git diff HEAD -- \
+    src/components/field/BlockerForm.jsx \
+    src/components/field/CloseoutPreview.jsx \
+    src/components/fieldv2/JobStateTransitioner.jsx \
+    src/components/fieldv2/JobCloseoutOutcomePanel.jsx \
+    src/lib/fieldCloseoutFeedbackViewModel.ts \
+    build-changes/README.md
+  git diff --no-index /dev/null src/lib/canonicalFieldEventCoverage.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/canonicalFieldEventCoverage.test.ts || true
+  git diff --no-index /dev/null src/lib/closeoutSubmissionFlags.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/closeoutSubmissionFlags.test.ts || true
+  git diff --no-index /dev/null src/lib/jobStateTransitionMutation.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/jobStateTransitionMutation.test.ts || true
+  git diff --no-index /dev/null src/lib/technicianCloseoutOutcomeSave.ts || true
+  git diff --no-index /dev/null src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts || true
+} > build-changes/iteration-14-canonical-events.patch
+```
+
+### How to use the patch
+
+From the **repository root**, apply **after** prior iteration patches your branch uses:
+
+```bash
+git apply --check build-changes/iteration-14-canonical-events.patch
+git apply build-changes/iteration-14-canonical-events.patch
+```
+
+---
+
 ## Adding future iterations
 
 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).
-2. Append a new section to this README with the file list and patch name.
+2. Append a new section to this README with the file list and patch name (and optionally a standalone **`iteration-N-<short-name>.md`** like Iteration 7).

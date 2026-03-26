@@ -1,6 +1,7 @@
 /**
  * Next-step copy for FieldJobDetail header — only from real job + evidence fields.
  */
+import { READINESS_SHORT_LINES } from '@/lib/fieldReadinessViewModel';
 
 export function getNextStepMessage(job, evidence = []) {
   if (!job?.status) return null;
@@ -10,13 +11,16 @@ export function getNextStepMessage(job, evidence = []) {
     job.runbook_phases?.every((phase) => phase.steps?.every((step) => step.completed)) ?? false;
 
   if (s === 'assigned') {
-    return 'Review job details, site notes, and contacts before heading out.';
+    return READINESS_SHORT_LINES.assigned;
   }
   if (s === 'en_route') {
-    return 'Travel to site and check in when you arrive.';
+    return READINESS_SHORT_LINES.en_route;
   }
-  if (s === 'checked_in' || s === 'paused') {
-    return 'Open Runbook and execute steps in order.';
+  if (s === 'checked_in') {
+    return READINESS_SHORT_LINES.checked_in;
+  }
+  if (s === 'paused') {
+    return READINESS_SHORT_LINES.paused;
   }
   if (s === 'in_progress') {
     if (!runbookDone) {

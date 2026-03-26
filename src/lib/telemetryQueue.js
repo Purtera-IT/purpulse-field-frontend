@@ -245,6 +245,31 @@ export async function getQueueStats() {
   };
 }
 
+/**
+ * Read-only: count queued telemetry rows whose envelope.job_id matches this job (string-coerced).
+ * Does not flush or mutate the queue.
+ * @param {string|number|null|undefined} jobId
+ * @returns {Promise<{ depth: number, hasPending: boolean, sample_errors: string[] }>}
+ */
+export async function getTelemetryQueueDepthForJob(jobId) {
+  if (jobId == null || jobId === '') {
+    return { depth: 0, hasPending: false, sample_errors: [] };
+  }
+  await pruneTelemetryQueueExpired();
+  const rows = await loadAllRows();
+  const jid = String(jobId);
+  const matched = rows.filter((r) => String(r.envelope?.job_id ?? '') === jid);
+  const errors = matched
+    .map((r) => r.last_error)
+    .filter(Boolean)
+    .slice(0, 2);
+  return {
+    depth: matched.length,
+    hasPending: matched.length > 0,
+    sample_errors: errors,
+  };
+}
+
 function scheduleFlushSoon() {
   if (_flushTimer) clearTimeout(_flushTimer);
   _flushTimer = setTimeout(() => {

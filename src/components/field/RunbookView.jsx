@@ -17,7 +17,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
-  CheckCircle2, Circle, RotateCcw, ChevronRight,
+  CheckCircle2, Circle, RotateCcw, ChevronRight, XCircle,
   AlertTriangle, Lock, Camera, FileText, ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ import { emitRunbookStepEvent } from '@/lib/runbookStepEvent';
 // ── Result config ─────────────────────────────────────────────────────
 const RESULT_CFG = {
   pass:             { icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50',  border: 'border-emerald-200', label: 'Passed'           },
+  fail:             { icon: XCircle,      color: 'text-red-600',     bg: 'bg-red-50',      border: 'border-red-200',     label: 'Failed'             },
   fail_remediated:  { icon: RotateCcw,    color: 'text-amber-500',   bg: 'bg-amber-50',    border: 'border-amber-200',   label: 'Failed→Remediated'},
   overridden:       { icon: AlertTriangle,color: 'text-orange-500',  bg: 'bg-orange-50',   border: 'border-orange-200',  label: 'Override'         },
   pending:          { icon: Circle,        color: 'text-slate-300',   bg: 'bg-white',       border: 'border-slate-100',   label: 'Pending'          },
@@ -37,7 +38,9 @@ const RESULT_CFG = {
 function stepResult(step) {
   if (!step.completed) return 'pending';
   if (step.override_reason) return 'overridden';
-  return step.result || 'pass';
+  const r = step.result || 'pass';
+  if (r === 'fail' || r === 'fail_remediated') return r === 'fail_remediated' ? 'fail_remediated' : 'fail';
+  return r;
 }
 
 // ── Step row ──────────────────────────────────────────────────────────

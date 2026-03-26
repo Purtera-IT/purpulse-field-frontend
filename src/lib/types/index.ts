@@ -46,6 +46,12 @@ export interface Job {
   signoff_notes?: string;
   qc_status?: 'pending' | 'passed' | 'failed';
   qc_fail_reasons?: string;
+  technician_closeout_outcome?: 'clean' | 'concerns' | 'problematic';
+  technician_closeout_rating?: number | null;
+  technician_closeout_complaint_flag?: boolean;
+  technician_closeout_compliment_flag?: boolean;
+  technician_closeout_notes?: string;
+  technician_closeout_recorded_at?: string;
   // Metadata
   created_date?: string;
   updated_date?: string;

@@ -1,0 +1,613 @@
+diff --git a/build-changes/README.md b/build-changes/README.md
+index 0804c58..09d89ee 100644
+--- a/build-changes/README.md
++++ b/build-changes/README.md
+@@ -330,8 +330,8 @@ Shared **Tailwind class tokens** (`fieldVisualTokens`) and a small **`FieldSecti
+ | -------- | ---- |
+ | **`FIELD_MAX_WIDTH`**, **`FIELD_PAGE_PAD_X`**, **`FIELD_PAGE_PAD_Y`** | Page column width and padding (aligned list + detail). |
+ | **`FIELD_STACK_GAP`**, **`FIELD_INNER_STACK`** | Vertical rhythm between major sections vs inside cards. |
+-| **`FIELD_OVERLINE`**, **`FIELD_OVERLINE_STRONG`** | Section eyebrows (10px, uppercase, slate). |
+-| **`FIELD_SECTION_TITLE`**, **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | In-card titles, body, secondary lines, mono IDs. |
++| **`FIELD_OVERLINE`** | Section eyebrows (10px, uppercase, slate). |
++| **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | Body, secondary lines, mono IDs. |
+ | **`FIELD_CARD`**, **`FIELD_CARD_HEADER`**, **`FIELD_CARD_BODY`** | Default white card shell + titled header band + body padding. |
+ | **`FIELD_SURFACE_MUTED`**, **`FIELD_SURFACE_WARNING`** | Secondary dashed panels; escalation / strong attention (amber). |
+ | **`BTN_PRIMARY`**, **`BTN_SECONDARY`**, **`BTN_DANGER`** | Named CTA fragments (slate / outline / red). |
+@@ -411,7 +411,11 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ `git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
+ 
+-### Deferred / Iteration 7 ideas
++### Iteration 6.1 (small cleanup, same canonical scope)
++
++- Dropped unused **`FIELD_OVERLINE_STRONG`** / **`FIELD_SECTION_TITLE`** tokens; tightened **JobOverview** and **PreJobToolCheckModal** operator copy; **FieldJobs** filter chips use bordered inactive state for contrast; **Evidence** thumbnails use slightly calmer QC/record overlays.
++
++### Deferred (Iteration 9+)
+ 
+ - Global theme, dark mode, animation polish, legacy pages.
+ - **`fj-blockers`** strip on job detail + read-only open escalations in Comms.
+@@ -419,7 +423,227 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ ---
+ 
++## Iteration 7 — Readiness + acknowledgement rigor (canonical path)
++
++Honest **Route → Start work → Work timer** readiness on **Overview** (`buildFieldReadinessSummary`), shared **`READINESS_SHORT_LINES`** for header next-step copy, lifecycle/timer framing, pre-job dialog outside-dismiss prevention, acknowledgement sheet operator copy. **No** shell, telemetry/Azure, or new job schema fields.
++
++Longer context: **[`iteration-7-readiness-rigor.md`](./iteration-7-readiness-rigor.md)**.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while these paths are **untracked**; once committed, fold them into **`git diff HEAD --`** only)
++
++- `src/lib/fieldReadinessViewModel.ts`
++- `src/lib/__tests__/fieldReadinessViewModel.test.ts`
++- `src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++**Modified**
++
++- `src/components/fieldv2/JobOverview.jsx`
++- `src/components/fieldv2/jobExecutionNextStep.js`
++- `src/components/fieldv2/JobStateTransitioner.jsx`
++- `src/components/fieldv2/FieldTimeTracker.jsx`
++- `src/components/fieldv2/PreJobToolCheckModal.jsx`
++- `src/components/field/AcknowledgementSheets.jsx`
++
++### Patch
++
++**[`iteration-7-readiness-rigor.patch`](./iteration-7-readiness-rigor.patch)**
++
++Re-run from the **repository root** to refresh ( **`git diff --no-index`** exits **1** when there are changes — append with **`|| true`** or run in a subshell):
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobOverview.jsx \
++    src/components/fieldv2/jobExecutionNextStep.js \
++    src/components/fieldv2/JobStateTransitioner.jsx \
++    src/components/fieldv2/FieldTimeTracker.jsx \
++    src/components/fieldv2/PreJobToolCheckModal.jsx \
++    src/components/field/AcknowledgementSheets.jsx
++  git diff --no-index /dev/null src/lib/fieldReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldReadinessViewModel.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/ReadinessSummaryCard.jsx || true
++} > build-changes/iteration-7-readiness-rigor.patch
++```
++
++Once the three **new** files are **tracked**, replace the three **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/fieldReadinessViewModel.ts src/lib/__tests__/fieldReadinessViewModel.test.ts src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++and merge into a single **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–6 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-7-readiness-rigor.patch
++git apply build-changes/iteration-7-readiness-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 8 — Runbook execution rigor (canonical path)
++
++Canonical **Runbook** tab is driven **only** by **`job.runbook_phases`** (no template list). Real **progress** from job-backed steps; **pass/fail** persists via **`mergeRunbookStepOutcome`** + **`base44.entities.Job.update`** after **`emitRunbookStepEvent`**, aligned with **[`RunbookView.jsx`](../src/components/field/RunbookView.jsx)** (`completed` + `result` including **`fail`** for legacy display). **Session-only** “Running” until complete/fail; **phase gating** matches RunbookView; **evidence** row shows linked count or **None linked**; failed steps link to **Comms**; **closeout** banner when runbook incomplete. **`runbookExecutionViewModel.ts`** holds pure ordering/gating/progress/merge helpers.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, use **`git diff HEAD --`** for those paths only)
++
++- `src/lib/runbookExecutionViewModel.ts`
++- `src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/RunbookSteps.jsx`
++- `src/pages/FieldJobDetail.jsx`
++- `src/components/field/RunbookView.jsx` — **`RESULT_CFG.fail`** + **`stepResult`** handles **`result: 'fail'`** (fieldv2 persistence alignment)
++
++### Patch
++
++**[`iteration-8-runbook-rigor.patch`](./iteration-8-runbook-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/field/RunbookView.jsx \
++    src/components/fieldv2/RunbookSteps.jsx \
++    src/pages/FieldJobDetail.jsx
++  git diff --no-index /dev/null src/lib/runbookExecutionViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/runbookExecutionViewModel.test.ts || true
++} > build-changes/iteration-8-runbook-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/runbookExecutionViewModel.ts src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–7 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-8-runbook-rigor.patch
++git apply build-changes/iteration-8-runbook-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** tree matches the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 9 — Closeout rigor & completion gating (canonical path)
++
++Closeout is an **operational checkpoint**: explicit **readiness summary** (`ready` / `blocked` / `review_suggested` for checklist-derived states), a **truthful checklist** tied to `canTransition` (work-complete + submit gates), **`job.evidence_requirements`** via `partitionEvidenceForRequirements`, **runbook** state, **sign-off** as one row (not the whole tab), **timer** (`workSegmentOpen`) and **Blocker** records (open/acknowledged ≠ resolved). **Action links** jump to Runbook, Evidence, Comms, Overview, or focus/scroll to sign-off. **Audit** stays secondary. **Job state → Complete work** copy nudges technicians to check Closeout first (no new backend lockouts).
++
++**Technical debt:** `FieldJobDetail` still loads blockers via `base44.entities.Blocker.filter` — should move behind `apiClient` / `jobRepository` when you add a canonical API path (keep `['blockers', jobId]` in sync with `BlockerForm`).
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, fold into **`git diff HEAD --`**)
++
++- `src/lib/closeoutReadinessViewModel.ts`
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/JobCloseoutSection.jsx`
++- `src/pages/FieldJobDetail.jsx` — `blockers` query (`base44.entities.Blocker.filter`), invalidate, props to Closeout
++- `src/components/fieldv2/JobStateTransitioner.jsx` — Closeout checklist hint on **Complete work**
++
++### Patch
++
++**[`iteration-9-closeout-rigor.patch`](./iteration-9-closeout-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobCloseoutSection.jsx \
++    src/pages/FieldJobDetail.jsx \
++    src/components/fieldv2/JobStateTransitioner.jsx
++  git diff --no-index /dev/null src/lib/closeoutReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/closeoutReadinessViewModel.test.ts || true
++} > build-changes/iteration-9-closeout-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/closeoutReadinessViewModel.ts src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–8 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-9-closeout-rigor.patch
++git apply build-changes/iteration-9-closeout-rigor.patch
++```
++
++---
++
++## Iteration 10 — QC & review-loop rigor (canonical Evidence path)
++
++**`evidenceQcViewModel.ts`** normalizes `qc_status` strings (`pass` / `passed` / `approved`, `fail` / `rejected`, etc.) into **pass | fail | pending**, rolls up counts for **uploaded** files only, and drives presentation copy. **Evidence** tab: **QC on saved files** summary strip (tight copy: saved vs QC outcome), **PASS | FAIL | REVIEW** pills on thumbnails (pending = review not recorded), **geo** pin top-right and **QC** pill bottom-right to reduce overlay clutter, section headers show **QC fail** counts when relevant, detail modal separates **file on job** vs **QC** with **Mark QC pass/fail**, failed-QC **replacement** CTA, and metadata rows. **Closeout** (`in_progress` + `pending_closeout`): **attention** row when any uploaded evidence is **QC fail** — operational wording (“may need replacement”), no backend lockout. Tests: `evidenceQcViewModel.test.ts`, extended `closeoutReadinessViewModel.test.ts`.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
++
++- `src/lib/evidenceQcViewModel.ts`
++- `src/lib/__tests__/evidenceQcViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/EvidenceGalleryView.jsx`
++- `src/lib/fieldEvidenceViewModel.ts` — `qc_status` on `EvidenceLike`
++- `src/lib/closeoutReadinessViewModel.ts` — QC-fail evidence attention row
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++### Patch
++
++**[`iteration-10-qc-review-rigor.patch`](./iteration-10-qc-review-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/fieldEvidenceViewModel.ts \
++    src/lib/closeoutReadinessViewModel.ts \
++    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
++    src/components/fieldv2/EvidenceGalleryView.jsx
++  git diff --no-index /dev/null src/lib/evidenceQcViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/evidenceQcViewModel.test.ts || true
++} > build-changes/iteration-10-qc-review-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/evidenceQcViewModel.ts src/lib/__tests__/evidenceQcViewModel.test.ts`
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–9 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-10-qc-review-rigor.patch
++git apply build-changes/iteration-10-qc-review-rigor.patch
++```
++
++---
++
+ ## Adding future iterations
+ 
+ 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).
+-2. Append a new section to this README with the file list and patch name.
++2. Append a new section to this README with the file list and patch name (and optionally a standalone **`iteration-N-<short-name>.md`** like Iteration 7).
+diff --git a/src/components/fieldv2/EvidenceGalleryView.jsx b/src/components/fieldv2/EvidenceGalleryView.jsx
+index 20ec120..f9f7861 100644
+--- a/src/components/fieldv2/EvidenceGalleryView.jsx
++++ b/src/components/fieldv2/EvidenceGalleryView.jsx
+@@ -18,20 +18,20 @@ import {
+   resolveRunbookStepTitle,
+   getStorageNoteForFileUrl,
+ } from '@/lib/fieldEvidenceViewModel';
++import {
++  getEvidenceQcPresentation,
++  normalizeEvidenceQcStatus,
++  rollupUploadedEvidenceQc,
++} from '@/lib/evidenceQcViewModel';
+ import {
+   BTN_PRIMARY,
+   FIELD_BODY,
+   FIELD_CARD,
+   FIELD_CTRL_H,
++  FIELD_META,
+   FIELD_OVERLINE,
+ } from '@/lib/fieldVisualTokens';
+ 
+-const QC_CFG = {
+-  pass: { bg: 'bg-emerald-500', label: 'Pass' },
+-  fail: { bg: 'bg-red-500', label: 'Fail' },
+-  unknown: { bg: 'bg-slate-400', label: '—' },
+-};
+-
+ function fmtTs(ts) {
+   try {
+     return format(parseISO(ts), 'MMM d HH:mm');
+@@ -103,9 +103,25 @@ function EvidenceRequirementsPanel({ job, evidence, onAddForRequirement }) {
+   );
+ }
+ 
++function EvidenceQcSummaryStrip({ evidence }) {
++  const r = rollupUploadedEvidenceQc(evidence);
++  if (r.uploadedCount === 0) return null;
++  return (
++    <div className={cn(FIELD_CARD, 'p-3 mb-4 border border-slate-200')}>
++      <p className={cn(FIELD_OVERLINE, 'mb-1')}>QC on saved files</p>
++      <p className="text-xs font-semibold text-slate-800 tabular-nums">
++        {r.passCount} passed · {r.failCount} failed · {r.pendingCount} not reviewed
++      </p>
++      <p className={cn(FIELD_META, 'mt-2 leading-snug')}>
++        Saved means the file is attached to the job. QC pass/fail is a separate review outcome.
++      </p>
++    </div>
++  );
++}
++
+ function Thumbnail({ ev, job, onClick }) {
+   const isImg = ev.content_type?.startsWith('image');
+-  const qc = QC_CFG[ev.qc_status] || QC_CFG.unknown;
++  const qcPres = getEvidenceQcPresentation(ev);
+   const st = getEvidenceStatusPresentation(ev);
+   const stepTitle = resolveRunbookStepTitle(job, ev.runbook_step_id);
+ 
+@@ -120,34 +136,41 @@ function Thumbnail({ ev, job, onClick }) {
+       ) : (
+         <FileText className="h-8 w-8 text-slate-400" />
+       )}
+-      <span
+-        className={cn('absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full border-2 border-white', qc.bg)}
+-        title={`QC: ${qc.label}`}
+-      />
+       {st.tone !== 'ok' && (
+         <span
+           className={cn(
+-            'absolute top-1.5 left-1.5 max-w-[85%] truncate rounded px-1 py-0.5 text-[8px] font-bold text-white shadow-sm',
+-            st.tone === 'error' ? 'bg-red-600' : st.tone === 'pending' ? 'bg-amber-600' : 'bg-slate-600',
++            'absolute top-1.5 left-1.5 max-w-[70%] truncate rounded px-1 py-0.5 text-[8px] font-semibold text-white',
++            st.tone === 'error' ? 'bg-red-600/95' : st.tone === 'pending' ? 'bg-amber-700/90' : 'bg-slate-600/95',
+           )}
+           title={st.label}
+         >
+           {st.shortLabel}
+         </span>
+       )}
++      {ev.geo_lat && (
++        <span className="absolute top-1.5 right-1.5 text-white drop-shadow-md" title="Has location">
++          <MapPin className="h-2.5 w-2.5" />
++        </span>
++      )}
+       {ev.runbook_step_id && (
+         <span
+-          className="absolute bottom-1 left-1 bg-black/55 text-white text-[8px] font-bold px-1 rounded max-w-[90%] truncate"
++          className="absolute bottom-1 left-1 right-10 bg-black/45 text-white text-[8px] font-semibold px-1 rounded truncate text-left"
+           title={ev.runbook_step_id}
+         >
+           {stepTitle || ev.runbook_step_id}
+         </span>
+       )}
+-      {ev.geo_lat && (
+-        <span className="absolute bottom-1 right-1 text-white">
+-          <MapPin className="h-2.5 w-2.5 drop-shadow" />
+-        </span>
+-      )}
++      <span
++        className={cn(
++          'absolute bottom-1 right-1 min-w-[1.25rem] text-center rounded px-1 py-0.5 text-[7px] font-black text-white ring-1 ring-white/90 shadow-sm leading-none',
++          qcPres.verdict === 'pass' && 'bg-emerald-600',
++          qcPres.verdict === 'fail' && 'bg-red-600',
++          qcPres.verdict === 'pending' && 'bg-slate-600'
++        )}
++        title={qcPres.detailLine}
++      >
++        {qcPres.pillLabel}
++      </span>
+     </button>
+   );
+ }
+@@ -164,11 +187,11 @@ function ExifRow({ label, value }) {
+   );
+ }
+ 
+-function DetailModal({ ev, job, onClose, onLabel, onQC }) {
++function DetailModal({ ev, job, onClose, onLabel, onQC, onAddReplacement }) {
+   const exif = ev.exif_metadata || {};
+   const hasGeo = ev.geo_lat != null;
+   const isImg = ev.content_type?.startsWith('image');
+-  const qc = QC_CFG[ev.qc_status] || QC_CFG.unknown;
++  const qcPres = getEvidenceQcPresentation(ev);
+   const st = getEvidenceStatusPresentation(ev);
+   const stepTitle = resolveRunbookStepTitle(job, ev.runbook_step_id);
+   const storageNote = getStorageNoteForFileUrl(ev.file_url);
+@@ -204,52 +227,96 @@ function DetailModal({ ev, job, onClose, onLabel, onQC }) {
+             </div>
+           )}
+ 
+-          <div className="flex items-center gap-3 flex-wrap">
+-            <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white', qc.bg)}>
+-              {qc.label === 'Pass' ? (
+-                <CheckCircle2 className="h-3.5 w-3.5" />
+-              ) : qc.label === 'Fail' ? (
+-                <XCircle className="h-3.5 w-3.5" />
+-              ) : (
+-                <Layers className="h-3.5 w-3.5" />
+-              )}
+-              QC: {qc.label}
+-            </div>
+-            <div
+-              className={cn(
+-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border',
+-                st.tone === 'ok' && 'bg-emerald-50 border-emerald-200 text-emerald-900',
+-                st.tone === 'pending' && 'bg-amber-50 border-amber-200 text-amber-950',
+-                st.tone === 'error' && 'bg-red-50 border-red-200 text-red-900',
+-                st.tone === 'muted' && 'bg-slate-50 border-slate-200 text-slate-700',
+-              )}
+-            >
+-              Record: {st.shortLabel}
++          <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 space-y-2">
++            <p className={cn(FIELD_OVERLINE, 'text-[10px]')}>Two different things</p>
++            <div className="flex flex-wrap items-center gap-2">
++              <div
++                className={cn(
++                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border',
++                  st.tone === 'ok' && 'bg-white border-emerald-200 text-emerald-900',
++                  st.tone === 'pending' && 'bg-white border-amber-200 text-amber-950',
++                  st.tone === 'error' && 'bg-white border-red-200 text-red-900',
++                  st.tone === 'muted' && 'bg-white border-slate-200 text-slate-700',
++                )}
++              >
++                File on job: {st.shortLabel}
++              </div>
++              <div
++                className={cn(
++                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white',
++                  qcPres.verdict === 'pass' && 'bg-emerald-600',
++                  qcPres.verdict === 'fail' && 'bg-red-600',
++                  qcPres.verdict === 'pending' && 'bg-slate-500',
++                )}
++              >
++                {qcPres.verdict === 'pass' ? (
++                  <CheckCircle2 className="h-3.5 w-3.5" />
++                ) : qcPres.verdict === 'fail' ? (
++                  <XCircle className="h-3.5 w-3.5" />
++                ) : (
++                  <Layers className="h-3.5 w-3.5" />
++                )}
++                {qcPres.shortLabel}
++              </div>
+             </div>
++            <p className={cn(FIELD_META, 'leading-snug')}>{qcPres.detailLine}</p>
+           </div>
+ 
+-          <div className="flex items-center gap-3 flex-wrap">
+-            <button
+-              type="button"
+-              onClick={() => onQC(ev, 'pass')}
+-              className={cn('px-3 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 flex items-center gap-1 rounded-xl', FIELD_CTRL_H)}
+-            >
+-              <CheckCircle2 className="h-3.5 w-3.5" /> Pass
+-            </button>
+-            <button
+-              type="button"
+-              onClick={() => onQC(ev, 'fail')}
+-              className={cn('px-3 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 flex items-center gap-1 rounded-xl', FIELD_CTRL_H)}
+-            >
+-              <XCircle className="h-3.5 w-3.5" /> Fail
+-            </button>
+-            <button
+-              type="button"
+-              onClick={() => onLabel(ev)}
+-              className={cn(BTN_PRIMARY, 'px-3 text-xs flex items-center gap-1 ml-auto', FIELD_CTRL_H)}
+-            >
+-              <Tag className="h-3.5 w-3.5" /> Label
+-            </button>
++          {qcPres.verdict === 'fail' && ev.status === 'uploaded' && (
++            <div className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2.5">
++              <p className="text-xs font-bold text-red-900">Not acceptable for QC yet</p>
++              <p className={cn(FIELD_META, 'mt-1 text-red-900/90 leading-snug')}>
++                This file stays on the job for history. If you need a retake, add new evidence — use Add Evidence or
++                the button below.
++              </p>
++              {onAddReplacement ? (
++                <button
++                  type="button"
++                  onClick={() => onAddReplacement()}
++                  className={cn(
++                    'mt-2 w-full sm:w-auto px-3 py-2 bg-red-700 text-white text-xs font-bold rounded-xl hover:bg-red-800',
++                    FIELD_CTRL_H,
++                  )}
++                >
++                  Add replacement evidence
++                </button>
++              ) : null}
++            </div>
++          )}
++
++          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
++            <p className={cn(FIELD_META, 'w-full sm:w-auto sm:mr-auto')}>
++              Set QC on this record (does not delete or replace the file).
++            </p>
++            <div className="flex flex-wrap gap-2">
++              <button
++                type="button"
++                onClick={() => onQC(ev, 'pass')}
++                className={cn(
++                  'px-3 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 flex items-center gap-1 rounded-xl',
++                  FIELD_CTRL_H,
++                )}
++              >
++                <CheckCircle2 className="h-3.5 w-3.5" /> Mark QC pass
++              </button>
++              <button
++                type="button"
++                onClick={() => onQC(ev, 'fail')}
++                className={cn(
++                  'px-3 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 flex items-center gap-1 rounded-xl',
++                  FIELD_CTRL_H,
++                )}
++              >
++                <XCircle className="h-3.5 w-3.5" /> Mark QC fail
++              </button>
++              <button
++                type="button"
++                onClick={() => onLabel(ev)}
++                className={cn(BTN_PRIMARY, 'px-3 text-xs flex items-center gap-1', FIELD_CTRL_H)}
++              >
++                <Tag className="h-3.5 w-3.5" /> Label
++              </button>
++            </div>
+           </div>
+ 
+           {storageNote && (
+@@ -263,7 +330,8 @@ function DetailModal({ ev, job, onClose, onLabel, onQC }) {
+             <table className="w-full">
+               <tbody>
+                 <ExifRow label="Type" value={ev.evidence_type} />
+-                <ExifRow label="Save status" value={st.label} />
++                <ExifRow label="File on job" value={st.label} />
++                <ExifRow label="QC status" value={qcPres.shortLabel} />
+                 <ExifRow label="Captured" value={fmtTs(ev.captured_at)} />
+                 <ExifRow label="Size" value={ev.size_bytes ? `${(ev.size_bytes / 1024).toFixed(0)} KB` : null} />
+                 <ExifRow label="MIME" value={ev.content_type} />
+@@ -336,12 +404,12 @@ export default function EvidenceGalleryView({ job, evidence, labels: _labels, ad
+   const [captureNonce, setCaptureNonce] = useState(0);
+   const [selectedEv, setSelectedEv] = useState(null);
+   const [labelerTarget, setLabelerTarget] = useState(null);
+-  const qc = useQueryClient();
++  const queryClient = useQueryClient();
+ 
+   const qcMutation = useMutation({
+     mutationFn: ({ id, verdict }) => base44.entities.Evidence.update(id, { qc_status: verdict }),
+     onSuccess: () => {
+-      qc.invalidateQueries({ queryKey: ['fj-evidence', job.id] });
++      queryClient.invalidateQueries({ queryKey: ['fj-evidence', job.id] });
+       onRefresh?.();
+     },
+   });
+@@ -398,6 +466,8 @@ export default function EvidenceGalleryView({ job, evidence, labels: _labels, ad
+         <EvidenceRequirementsPanel job={job} evidence={evidence} onAddForRequirement={(type) => openCapture({ evidenceType: type })} />
+       </div>
+ 
++      <EvidenceQcSummaryStrip evidence={evidence} />
++
+       <button
+         type="button"
+         onClick={() => openCapture({})}
+@@ -413,11 +483,19 @@ export default function EvidenceGalleryView({ job, evidence, labels: _labels, ad
+         </p>
+       )}
+ 
+-      {gallerySections.map((section) => (
++      {gallerySections.map((section) => {
++        const qcFails = section.items.filter(
++          (e) => e.status === 'uploaded' && normalizeEvidenceQcStatus(e.qc_status) === 'fail',
++        ).length;
++        const subtitleExtra = qcFails > 0 ? ` · ${qcFails} QC fail` : '';
++        return (
+         <div key={section.key}>
+           <p className={cn(FIELD_OVERLINE, 'mb-2 capitalize')}>
+             {section.title}{' '}
+-            <span className="font-normal text-slate-300 normal-case">({section.subtitle})</span>
++            <span className="font-normal text-slate-300 normal-case">
++              ({section.subtitle}
++              {subtitleExtra})
++            </span>
+           </p>
+           {section.items.length === 0 ? (
+             <p className="text-xs text-slate-400 py-2 pl-0.5">No items in this bucket yet.</p>
+@@ -429,7 +507,8 @@ export default function EvidenceGalleryView({ job, evidence, labels: _labels, ad
+             </div>
+           )}
+         </div>
+-      ))}
++        );
++      })}
+ 
+       {evidence.length === 0 && (
+         <div className="py-16 text-center text-slate-400 text-sm">
+@@ -461,6 +540,10 @@ export default function EvidenceGalleryView({ job, evidence, labels: _labels, ad
+           onClose={() => setSelectedEv(null)}
+           onLabel={handleLabel}
+           onQC={handleQC}
++          onAddReplacement={() => {
++            setSelectedEv(null);
++            openCapture({});
++          }}
+         />
+       )}
+       {labelerTarget && (
+diff --git a/src/lib/fieldEvidenceViewModel.ts b/src/lib/fieldEvidenceViewModel.ts
+index 794d9c0..71fd8a5 100644
+--- a/src/lib/fieldEvidenceViewModel.ts
++++ b/src/lib/fieldEvidenceViewModel.ts
+@@ -20,6 +20,8 @@ export type EvidenceLike = {
+   file_url?: string
+   runbook_step_id?: string
+   upload_error?: string
++  /** Backend string; normalize with `normalizeEvidenceQcStatus` in evidenceQcViewModel */
++  qc_status?: string | null
+ }
+ 
+ export type EvidenceRequirementLike = {

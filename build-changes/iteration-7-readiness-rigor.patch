@@ -1,0 +1,552 @@
+diff --git a/src/components/field/AcknowledgementSheets.jsx b/src/components/field/AcknowledgementSheets.jsx
+index b4c8f04..a5b3353 100644
+--- a/src/components/field/AcknowledgementSheets.jsx
++++ b/src/components/field/AcknowledgementSheets.jsx
+@@ -1,5 +1,5 @@
+ /**
+- * Iteration 11 — pre-arrival / travel micro-acknowledgement sheets (bottom sheets).
++ * Pre-arrival scope and ETA acknowledgement sheets (canonical field / timer flows).
+  */
+ import React, { useState, useEffect } from 'react';
+ import {
+@@ -19,7 +19,7 @@ import {
+ } from '@/constants/scopeAcknowledgements';
+ 
+ /**
+- * Five scope/readiness flags before site arrival (arrival_event).
++ * Scope/readiness flags before starting the work timer or equivalent flows.
+  * @param {Object} props
+  * @param {boolean} props.open
+  * @param {(open: boolean) => void} props.onOpenChange
+@@ -58,8 +58,7 @@ export function PreArrivalAckSheet({ open, onOpenChange, jobLabel, onConfirm })
+             <SheetTitle className="text-base">Before you arrive</SheetTitle>
+           </div>
+           <SheetDescription className="text-xs text-left leading-relaxed">
+-            Confirm scope readiness — fields map to canonical <code className="text-[10px]">arrival_event</code>{' '}
+-            (Iteration 11).
++            Confirm you have reviewed scope, risks, and site constraints before time starts on this job.
+             {jobLabel ? <span className="block mt-1 font-semibold text-slate-700">{jobLabel}</span> : null}
+           </SheetDescription>
+         </SheetHeader>
+@@ -97,7 +96,7 @@ export function PreArrivalAckSheet({ open, onOpenChange, jobLabel, onConfirm })
+ }
+ 
+ /**
+- * Single ETA / route acknowledgement (travel_event.eta_ack_timestamp).
++ * ETA / route acknowledgement before marking en route.
+  */
+ export function EtaAcknowledgementSheet({
+   open,
+@@ -138,6 +137,9 @@ export function EtaAcknowledgementSheet({
+           </div>
+           <SheetDescription className="text-xs text-left leading-relaxed">
+             {description}
++            <span className="block mt-2 text-slate-600">
++              First of three readiness steps on this job: route, then start work, then the work timer.
++            </span>
+             {jobLabel ? <span className="block mt-2 font-semibold text-slate-700">{jobLabel}</span> : null}
+           </SheetDescription>
+         </SheetHeader>
+diff --git a/src/components/fieldv2/FieldTimeTracker.jsx b/src/components/fieldv2/FieldTimeTracker.jsx
+index 9be5038..540aaf5 100644
+--- a/src/components/fieldv2/FieldTimeTracker.jsx
++++ b/src/components/fieldv2/FieldTimeTracker.jsx
+@@ -21,6 +21,7 @@ import {
+   FIELD_BODY,
+   FIELD_CARD,
+   FIELD_CTRL_H,
++  FIELD_META,
+   FIELD_OVERLINE,
+ } from '@/lib/fieldVisualTokens';
+ 
+@@ -143,7 +144,12 @@ export default function FieldTimeTracker({
+             on this job
+           </span>
+         </p>
+-        <p className={cn(FIELD_BODY, 'mb-3')}>{executionView.sessionSummaryLine}</p>
++        <p className={cn(FIELD_BODY, 'mb-2')}>{executionView.sessionSummaryLine}</p>
++        {canClockIn && !liveTimer.workSegmentOpen ? (
++          <p className={cn(FIELD_META, 'mb-3 leading-snug')}>
++            Third of three readiness steps: starting the timer opens a short site check before work time is recorded.
++          </p>
++        ) : null}
+         <div className="flex gap-2">
+           <button
+             type="button"
+diff --git a/src/components/fieldv2/JobOverview.jsx b/src/components/fieldv2/JobOverview.jsx
+index c6dd0fc..5647a5a 100644
+--- a/src/components/fieldv2/JobOverview.jsx
++++ b/src/components/fieldv2/JobOverview.jsx
+@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
+ import FieldTimeTracker from './FieldTimeTracker';
+ import JobStateTransitioner from './JobStateTransitioner';
+ import FieldSectionCard from './FieldSectionCard';
++import ReadinessSummaryCard from './ReadinessSummaryCard';
+ import { LIFECYCLE_DISPLAY } from '@/lib/fieldJobExecutionModel';
+ import {
+   FIELD_BODY,
+@@ -105,12 +106,14 @@ export default function JobOverview({
+         </div>
+       </FieldSectionCard>
+ 
++      <ReadinessSummaryCard job={job} timeEntries={timeEntries} />
++
+       <div>
+         <p className={cn(FIELD_OVERLINE, 'mb-2 px-0.5')}>
+           Job state
+         </p>
+         <p className="text-[11px] text-slate-500 mb-2 px-0.5 leading-snug">
+-          Use this section to update travel, check-in, work, pause, and completion status.
++          Update travel, check-in, work, pause, and completion status here.
+         </p>
+         <JobStateTransitioner
+           job={job}
+@@ -197,8 +200,7 @@ export default function JobOverview({
+           Work timer
+         </p>
+         <p className="text-[11px] text-slate-500 mb-2 px-0.5 leading-snug">
+-          Billable work time for this job (TimeEntry). Tied to job lifecycle — start after check-in / in
+-          progress.
++          Billable time for this job (TimeEntry). Starts after check-in / in progress per job state.
+         </p>
+         <FieldTimeTracker
+           job={job}
+diff --git a/src/components/fieldv2/JobStateTransitioner.jsx b/src/components/fieldv2/JobStateTransitioner.jsx
+index 6cd342c..f7ae1b9 100644
+--- a/src/components/fieldv2/JobStateTransitioner.jsx
++++ b/src/components/fieldv2/JobStateTransitioner.jsx
+@@ -23,6 +23,11 @@ import PreJobToolCheckModal from './PreJobToolCheckModal';
+ import { EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
+ import { BTN_SECONDARY, FIELD_CARD, FIELD_CTRL_H, FIELD_META } from '@/lib/fieldVisualTokens';
+ 
++const READINESS_HINT_EN_ROUTE =
++  'You will confirm travel / ETA details before the job moves to en route.';
++const READINESS_HINT_START_WORK =
++  'A short pre-start checklist runs before the job moves to in progress.';
++
+ function RequirementItem({ requirement, blocker }) {
+   const status = blocker?.isMet ? 'met' : 'unmet';
+   return (
+@@ -242,7 +247,22 @@ export default function JobStateTransitioner({
+                         → {targetLabel.label}
+                       </span>
+                     </div>
+-                    <p className="text-xs text-slate-600 mb-2">{description}</p>
++                    <p
++                      className={cn(
++                        'text-xs text-slate-600',
++                        to === 'en_route' || (to === 'in_progress' && currentStatus !== 'paused')
++                          ? 'mb-1'
++                          : 'mb-2'
++                      )}
++                    >
++                      {description}
++                    </p>
++                    {to === 'en_route' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_EN_ROUTE}</p>
++                    ) : null}
++                    {to === 'in_progress' && currentStatus !== 'paused' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_START_WORK}</p>
++                    ) : null}
+ 
+                     {/* Blockers */}
+                     {gate.blockers.length > 0 && (
+diff --git a/src/components/fieldv2/PreJobToolCheckModal.jsx b/src/components/fieldv2/PreJobToolCheckModal.jsx
+index 934fc2a..eb3a3ae 100644
+--- a/src/components/fieldv2/PreJobToolCheckModal.jsx
++++ b/src/components/fieldv2/PreJobToolCheckModal.jsx
+@@ -1,6 +1,6 @@
+ /**
+- * Pre-job readiness checklist (Iteration 10).
+- * Blocks "Start Job" until all items are checked; emits tool_check_event before parent continues.
++ * Pre-job readiness checklist before moving to in progress.
++ * Blocks confirm until items are checked; queues tool-check telemetry before parent continues.
+  */
+ import React, { useState } from 'react';
+ import {
+@@ -92,7 +92,11 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
+ 
+   return (
+     <Dialog open={open} onOpenChange={handleOpenChange}>
+-      <DialogContent className="max-w-md rounded-2xl">
++      <DialogContent
++        className="max-w-md rounded-2xl"
++        onPointerDownOutside={(e) => e.preventDefault()}
++        onInteractOutside={(e) => e.preventDefault()}
++      >
+         <DialogHeader>
+           <div className="flex items-center gap-2">
+             <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center">
+@@ -101,8 +105,8 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
+             <DialogTitle className="text-left">Pre-job readiness</DialogTitle>
+           </div>
+           <DialogDescription className="text-left text-xs leading-relaxed">
+-            Complete the checklist to start work. A canonical <code className="text-[10px]">tool_check_event</code> is sent
+-            for compliance and eligibility signals.
++            Second of three: route confirmation, this pre-start checklist, then a short check when you start the work
++            timer. Complete required checks before starting work. Use Cancel if you are not ready to continue.
+           </DialogDescription>
+         </DialogHeader>
+ 
+@@ -127,10 +131,9 @@ export default function PreJobToolCheckModal({ open, onOpenChange, job, user, on
+         </div>
+ 
+         <div className={cn(FIELD_CARD, 'p-3 space-y-2')}>
+-          <p className={FIELD_OVERLINE}>Scope &amp; docs (Iteration 11)</p>
++          <p className={FIELD_OVERLINE}>Scope &amp; documentation</p>
+           <p className="text-[10px] text-slate-500 leading-snug">
+-            Same signals as pre-arrival <code className="text-[9px]">arrival_event</code> flags — recorded on this{' '}
+-            <code className="text-[9px]">tool_check_event</code> when you start from overview/state machine.
++            Confirm scope and documentation match what you will perform on site. This is recorded when you confirm below.
+           </p>
+           {SCOPE_ACKNOWLEDGEMENT_ITEMS.map((item) => (
+             <label
+diff --git a/src/components/fieldv2/jobExecutionNextStep.js b/src/components/fieldv2/jobExecutionNextStep.js
+index ed97050..f0405be 100644
+--- a/src/components/fieldv2/jobExecutionNextStep.js
++++ b/src/components/fieldv2/jobExecutionNextStep.js
+@@ -1,6 +1,7 @@
+ /**
+  * Next-step copy for FieldJobDetail header — only from real job + evidence fields.
+  */
++import { READINESS_SHORT_LINES } from '@/lib/fieldReadinessViewModel';
+ 
+ export function getNextStepMessage(job, evidence = []) {
+   if (!job?.status) return null;
+@@ -10,13 +11,16 @@ export function getNextStepMessage(job, evidence = []) {
+     job.runbook_phases?.every((phase) => phase.steps?.every((step) => step.completed)) ?? false;
+ 
+   if (s === 'assigned') {
+-    return 'Review job details, site notes, and contacts before heading out.';
++    return READINESS_SHORT_LINES.assigned;
+   }
+   if (s === 'en_route') {
+-    return 'Travel to site and check in when you arrive.';
++    return READINESS_SHORT_LINES.en_route;
+   }
+-  if (s === 'checked_in' || s === 'paused') {
+-    return 'Open Runbook and execute steps in order.';
++  if (s === 'checked_in') {
++    return READINESS_SHORT_LINES.checked_in;
++  }
++  if (s === 'paused') {
++    return READINESS_SHORT_LINES.paused;
+   }
+   if (s === 'in_progress') {
+     if (!runbookDone) {
+diff --git a/src/lib/fieldReadinessViewModel.ts b/src/lib/fieldReadinessViewModel.ts
+new file mode 100644
+index 0000000..448ca3b
+--- /dev/null
++++ b/src/lib/fieldReadinessViewModel.ts
+@@ -0,0 +1,163 @@
++/**
++ * Coarse readiness summary for canonical FieldJobDetail Overview.
++ * Derived only from job.status + whether any work_start TimeEntry exists — no fake persisted flags.
++ */
++import type { Job } from '@/api/types'
++
++export type ReadinessPhaseState = 'complete' | 'current' | 'upcoming'
++
++export interface ReadinessPhaseRow {
++  id: 'route' | 'start_work' | 'work_timer'
++  title: string
++  detail: string
++  state: ReadinessPhaseState
++}
++
++export interface FieldReadinessSummary {
++  headline: string
++  disclaimer: string
++  phases: ReadinessPhaseRow[]
++}
++
++/**
++ * Short next-step lines for the job header — same operator tone as Overview readiness (avoid copy drift).
++ * Does not replace status-specific logic in `getNextStepMessage` for in_progress and later.
++ */
++export const READINESS_SHORT_LINES = {
++  assigned:
++    'Review site details before heading out. Going en route will ask you to confirm travel.',
++  en_route:
++    'Travel to site, check in when you arrive, then start work when ready (short checklist first).',
++  checked_in:
++    'Start work when ready — a short pre-start checklist runs first. Then open Runbook and use the timer when you bill.',
++  paused:
++    'Resume work in job state when ready. Start the timer when you are billing time again.',
++} as const
++
++function routePhaseComplete(status: Job['status']): boolean {
++  return status !== 'assigned'
++}
++
++function startWorkPhaseComplete(status: Job['status']): boolean {
++  return (
++    status === 'in_progress' ||
++    status === 'paused' ||
++    status === 'pending_closeout' ||
++    status === 'submitted' ||
++    status === 'approved' ||
++    status === 'rejected'
++  )
++}
++
++function timerPhaseComplete(hasWorkStartTimeEntry: boolean): boolean {
++  return hasWorkStartTimeEntry
++}
++
++function assignPhaseStates(
++  routeDone: boolean,
++  startDone: boolean,
++  timerDone: boolean
++): { route: ReadinessPhaseState; start_work: ReadinessPhaseState; work_timer: ReadinessPhaseState } {
++  const phases = [
++    { id: 'route' as const, done: routeDone },
++    { id: 'start_work' as const, done: startDone },
++    { id: 'work_timer' as const, done: timerDone },
++  ]
++  let seenCurrent = false
++  const out: Record<string, ReadinessPhaseState> = {}
++  for (const p of phases) {
++    if (p.done) {
++      out[p.id] = 'complete'
++    } else if (!seenCurrent) {
++      out[p.id] = 'current'
++      seenCurrent = true
++    } else {
++      out[p.id] = 'upcoming'
++    }
++  }
++  return {
++    route: out.route,
++    start_work: out.start_work,
++    work_timer: out.work_timer,
++  }
++}
++
++function headlineForStatus(job: Job, hasWorkStartTimeEntry: boolean): string {
++  const s = job.status
++  if (s === 'assigned') {
++    return READINESS_SHORT_LINES.assigned
++  }
++  if (s === 'en_route') {
++    return 'On the way. Check in at site, then use Start work when you are ready to begin active work.'
++  }
++  if (s === 'checked_in') {
++    return 'On site. Start work runs a short pre-start checklist before the job moves to in progress.'
++  }
++  if (s === 'paused') {
++    return 'Job paused. Resume work in job state when ready; resuming skips the pre-start checklist.'
++  }
++  if (s === 'in_progress' && !hasWorkStartTimeEntry) {
++    return 'Start the work timer when you begin billable work — a short site readiness check appears first.'
++  }
++  if (s === 'in_progress') {
++    return 'Work in progress. Keep runbook and evidence up to date.'
++  }
++  if (s === 'pending_closeout' || s === 'submitted' || s === 'approved' || s === 'rejected') {
++    return 'Readiness steps for starting work are behind you for this job.'
++  }
++  return 'Follow job state and timer as you work this order.'
++}
++
++const DISCLAIMER =
++  'Shown from job state on this app — not a separate compliance record from the server.'
++
++export function buildFieldReadinessSummary(
++  job: Job,
++  options: { hasWorkStartTimeEntry: boolean }
++): FieldReadinessSummary {
++  const { hasWorkStartTimeEntry } = options
++  const routeDone = routePhaseComplete(job.status)
++  const startDone = startWorkPhaseComplete(job.status)
++  const timerDone = timerPhaseComplete(hasWorkStartTimeEntry)
++  const states = assignPhaseStates(routeDone, startDone, timerDone)
++
++  const routeDetail = (() => {
++    if (states.route === 'complete') {
++      return 'Job is past assigned — travel confirmation was part of going en route in this app.'
++    }
++    if (states.route === 'current') {
++      return 'Use Start route when you leave; you will confirm travel details then.'
++    }
++    return 'Confirm travel when you start route.'
++  })()
++
++  const startDetail = (() => {
++    if (states.start_work === 'complete') {
++      return 'Pre-start checklist was part of entering in progress (except resuming from pause).'
++    }
++    if (states.start_work === 'current') {
++      return 'Use Start work when ready — a short checklist runs before in progress.'
++    }
++    return 'Runs when you move to in progress from checked in.'
++  })()
++
++  const timerDetail = (() => {
++    if (states.work_timer === 'complete') {
++      return 'Work timer has been started at least once — scope check runs when you start a segment.'
++    }
++    if (states.work_timer === 'current') {
++      return 'Tap Start timer — a short site scope checklist appears before time logs.'
++    }
++    return 'After in progress, start the timer when you begin billable work.'
++  })()
++
++  return {
++    headline: headlineForStatus(job, hasWorkStartTimeEntry),
++    disclaimer: DISCLAIMER,
++    phases: [
++      { id: 'route', title: 'Route', detail: routeDetail, state: states.route },
++      { id: 'start_work', title: 'Start work', detail: startDetail, state: states.start_work },
++      { id: 'work_timer', title: 'Work timer', detail: timerDetail, state: states.work_timer },
++    ],
++  }
++}
+diff --git a/src/lib/__tests__/fieldReadinessViewModel.test.ts b/src/lib/__tests__/fieldReadinessViewModel.test.ts
+new file mode 100644
+index 0000000..49370a7
+--- /dev/null
++++ b/src/lib/__tests__/fieldReadinessViewModel.test.ts
+@@ -0,0 +1,77 @@
++import { describe, it, expect } from 'vitest'
++import { buildFieldReadinessSummary, READINESS_SHORT_LINES } from '../fieldReadinessViewModel'
++import type { Job } from '@/api/types'
++
++function baseJob(over: Partial<Job>): Job {
++  return {
++    id: 'j1',
++    created_date: '2025-01-01T00:00:00.000Z',
++    updated_date: '2025-01-01T00:00:00.000Z',
++    created_by: 'a@b.com',
++    title: 'T',
++    status: 'assigned',
++    priority: 'medium',
++    ...over,
++  } as Job
++}
++
++describe('buildFieldReadinessSummary', () => {
++  it('assigned: route is current', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'assigned' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.phases[0].state).toBe('current')
++    expect(s.phases[1].state).toBe('upcoming')
++    expect(s.phases[2].state).toBe('upcoming')
++    expect(s.headline).toMatch(/en route/i)
++  })
++
++  it('en_route: route complete, start work current', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'en_route' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.phases[0].state).toBe('complete')
++    expect(s.phases[1].state).toBe('current')
++    expect(s.phases[2].state).toBe('upcoming')
++  })
++
++  it('checked_in: start work current', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'checked_in' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.phases[0].state).toBe('complete')
++    expect(s.phases[1].state).toBe('current')
++    expect(s.phases[2].state).toBe('upcoming')
++  })
++
++  it('in_progress without work_start: timer current', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'in_progress' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.phases[0].state).toBe('complete')
++    expect(s.phases[1].state).toBe('complete')
++    expect(s.phases[2].state).toBe('current')
++    expect(s.headline).toMatch(/timer/i)
++  })
++
++  it('in_progress with work_start: all complete', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'in_progress' }), {
++      hasWorkStartTimeEntry: true,
++    })
++    expect(s.phases.every((p) => p.state === 'complete')).toBe(true)
++  })
++
++  it('includes disclaimer', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'assigned' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.disclaimer.length).toBeGreaterThan(10)
++  })
++
++  it('assigned headline matches READINESS_SHORT_LINES.assigned', () => {
++    const s = buildFieldReadinessSummary(baseJob({ status: 'assigned' }), {
++      hasWorkStartTimeEntry: false,
++    })
++    expect(s.headline).toBe(READINESS_SHORT_LINES.assigned)
++  })
++})
+diff --git a/src/components/fieldv2/ReadinessSummaryCard.jsx b/src/components/fieldv2/ReadinessSummaryCard.jsx
+new file mode 100644
+index 0000000..fcf287d
+--- /dev/null
++++ b/src/components/fieldv2/ReadinessSummaryCard.jsx
+@@ -0,0 +1,58 @@
++/**
++ * Coarse readiness summary for Overview — derived from job.status + work_start TimeEntry presence.
++ */
++import React, { useMemo } from 'react';
++import { CheckCircle2, Circle, CircleDot } from 'lucide-react';
++import { cn } from '@/lib/utils';
++import { buildFieldReadinessSummary } from '@/lib/fieldReadinessViewModel';
++import FieldSectionCard from './FieldSectionCard';
++import { FIELD_BODY, FIELD_META } from '@/lib/fieldVisualTokens';
++
++function PhaseIcon({ state }) {
++  if (state === 'complete') {
++    return <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" aria-hidden />;
++  }
++  if (state === 'current') {
++    return <CircleDot className="h-4 w-4 text-slate-800 flex-shrink-0 mt-0.5" aria-hidden />;
++  }
++  return <Circle className="h-4 w-4 text-slate-300 flex-shrink-0 mt-0.5" aria-hidden />;
++}
++
++export default function ReadinessSummaryCard({ job, timeEntries = [] }) {
++  const hasWorkStartTimeEntry = useMemo(
++    () => timeEntries.some((e) => e.entry_type === 'work_start'),
++    [timeEntries]
++  );
++
++  const summary = useMemo(
++    () => buildFieldReadinessSummary(job, { hasWorkStartTimeEntry }),
++    [job, hasWorkStartTimeEntry]
++  );
++
++  return (
++    <FieldSectionCard title="Readiness" variant="muted">
++      <p className={cn(FIELD_BODY, 'font-medium text-slate-800 mb-3')}>{summary.headline}</p>
++      <ul className="space-y-2.5" aria-label="Readiness phases">
++        {summary.phases.map((p) => (
++          <li key={p.id} className="flex gap-2.5">
++            <PhaseIcon state={p.state} />
++            <div className="min-w-0">
++              <p
++                className={cn(
++                  'text-xs font-semibold',
++                  p.state === 'current' ? 'text-slate-900' : 'text-slate-600'
++                )}
++              >
++                {p.title}
++              </p>
++              <p className={cn(FIELD_META, 'mt-0.5 leading-snug')}>{p.detail}</p>
++            </div>
++          </li>
++        ))}
++      </ul>
++      <p className={cn(FIELD_META, 'mt-3 pt-2 border-t border-slate-200/80 leading-snug')}>
++        {summary.disclaimer}
++      </p>
++    </FieldSectionCard>
++  );
++}

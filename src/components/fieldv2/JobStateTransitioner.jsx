@@ -5,7 +5,6 @@
 
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import {
   canTransition,
@@ -18,10 +17,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
+import { executeJobStateTransitionMutation } from '@/lib/jobStateTransitionMutation';
 import PreJobToolCheckModal from './PreJobToolCheckModal';
 import { EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
 import { BTN_SECONDARY, FIELD_CARD, FIELD_CTRL_H, FIELD_META } from '@/lib/fieldVisualTokens';
+
+const READINESS_HINT_EN_ROUTE =
+  'You will confirm travel / ETA details before the job moves to en route.';
+const READINESS_HINT_START_WORK =
+  'A short pre-start checklist runs before the job moves to in progress.';
 
 function RequirementItem({ requirement, blocker }) {
   const status = blocker?.isMet ? 'met' : 'unmet';
@@ -62,49 +66,23 @@ export default function JobStateTransitioner({
   const pendingEnRouteRef = useRef(null);
   const qc = useQueryClient();
 
+  /*
+   * TECHNICAL_DEBT (target Iteration 4/5): Field v2 canonical path uses jobRepository / apiClient
+   * elsewhere; long-term, job status updates should go through the same abstraction instead of
+   * direct base44.entities.Job.update. Intentionally unchanged scope for Iteration 3 (executeJobStateTransitionMutation).
+   */
   const transitionMutation = useMutation({
-    mutationFn: async ({ toStatus, isOverride, dispatchOverrides, priorStatus }) => {
-      if (!job?.id || !user) {
-        throw new Error('Missing job or user');
-      }
-      const fromStatus = priorStatus ?? job.status;
-      try {
-        await emitDispatchEventForJobStatusChange({
-          job,
-          targetAppStatus: toStatus,
-          user,
-          overrides:
-            dispatchOverrides && typeof dispatchOverrides === 'object' ? dispatchOverrides : {},
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (import.meta.env.DEV) console.error('[JobStateTransitioner] dispatch_event', e);
-        throw new Error(`Telemetry: ${msg}`);
-      }
-      const now = new Date().toISOString();
-      const timeFields = {};
-      if (toStatus === 'checked_in') {
-        timeFields.check_in_time = now;
-      }
-      if (toStatus === 'in_progress' && fromStatus !== 'paused') {
-        timeFields.work_start_time = now;
-        timeFields.check_in_time = job.check_in_time || now;
-      }
-      if (toStatus === 'pending_closeout') {
-        timeFields.work_end_time = now;
-      }
-      const payload = {
-        status: toStatus,
-        ...timeFields,
-        ...(isOverride && { override_reason: overrideReason, overridden_by: user.email }),
-      };
-      /*
-       * TECHNICAL_DEBT (target Iteration 4/5): Field v2 canonical path uses jobRepository / apiClient
-       * elsewhere; long-term, job status updates should go through the same abstraction instead of
-       * direct base44.entities.Job.update. Intentionally unchanged scope for Iteration 3.
-       */
-      return base44.entities.Job.update(job.id, payload);
-    },
+    mutationFn: ({ toStatus, isOverride, dispatchOverrides, priorStatus }) =>
+      executeJobStateTransitionMutation({
+        job,
+        user,
+        evidence,
+        toStatus,
+        fromStatus: priorStatus ?? job.status,
+        isOverride,
+        overrideReason,
+        dispatchOverrides,
+      }),
     onSuccess: (data) => {
       if (!job?.id) return;
       qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
@@ -242,7 +220,28 @@ export default function JobStateTransitioner({
                         → {targetLabel.label}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mb-2">{description}</p>
+                    <p
+                      className={cn(
+                        'text-xs text-slate-600',
+                        to === 'en_route' || (to === 'in_progress' && currentStatus !== 'paused')
+                          ? 'mb-1'
+                          : 'mb-2'
+                      )}
+                    >
+                      {description}
+                    </p>
+                    {to === 'en_route' ? (
+                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_EN_ROUTE}</p>
+                    ) : null}
+                    {to === 'in_progress' && currentStatus !== 'paused' ? (
+                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_START_WORK}</p>
+                    ) : null}
+                    {to === 'pending_closeout' ? (
+                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>
+                        Open the <strong className="font-semibold text-slate-700">Closeout</strong> tab first — it
+                        lists what is still missing before you should mark work complete.
+                      </p>
+                    ) : null}
 
                     {/* Blockers */}
                     {gate.blockers.length > 0 && (

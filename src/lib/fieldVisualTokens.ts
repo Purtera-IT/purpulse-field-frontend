@@ -22,13 +22,6 @@ export const FIELD_INNER_STACK = 'space-y-3'
 export const FIELD_OVERLINE =
   'text-[10px] font-semibold text-slate-500 uppercase tracking-wider'
 
-/** Strong overline for emphasis (still enterprise, not playful) */
-export const FIELD_OVERLINE_STRONG =
-  'text-[10px] font-bold text-slate-500 uppercase tracking-wider'
-
-/** Small section title inside a card */
-export const FIELD_SECTION_TITLE = 'text-sm font-bold text-slate-900 leading-snug'
-
 /** Body copy */
 export const FIELD_BODY = 'text-xs text-slate-600 leading-relaxed'
 

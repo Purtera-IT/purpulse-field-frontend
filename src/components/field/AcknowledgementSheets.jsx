@@ -1,5 +1,5 @@
 /**
- * Iteration 11 — pre-arrival / travel micro-acknowledgement sheets (bottom sheets).
+ * Pre-arrival scope and ETA acknowledgement sheets (canonical field / timer flows).
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -19,7 +19,7 @@ import {
 } from '@/constants/scopeAcknowledgements';
 
 /**
- * Five scope/readiness flags before site arrival (arrival_event).
+ * Scope/readiness flags before starting the work timer or equivalent flows.
  * @param {Object} props
  * @param {boolean} props.open
  * @param {(open: boolean) => void} props.onOpenChange
@@ -58,8 +58,7 @@ export function PreArrivalAckSheet({ open, onOpenChange, jobLabel, onConfirm }) 
             <SheetTitle className="text-base">Before you arrive</SheetTitle>
           </div>
           <SheetDescription className="text-xs text-left leading-relaxed">
-            Confirm scope readiness — fields map to canonical <code className="text-[10px]">arrival_event</code>{' '}
-            (Iteration 11).
+            Confirm you have reviewed scope, risks, and site constraints before time starts on this job.
             {jobLabel ? <span className="block mt-1 font-semibold text-slate-700">{jobLabel}</span> : null}
           </SheetDescription>
         </SheetHeader>
@@ -97,7 +96,7 @@ export function PreArrivalAckSheet({ open, onOpenChange, jobLabel, onConfirm }) 
 }
 
 /**
- * Single ETA / route acknowledgement (travel_event.eta_ack_timestamp).
+ * ETA / route acknowledgement before marking en route.
  */
 export function EtaAcknowledgementSheet({
   open,
@@ -138,6 +137,9 @@ export function EtaAcknowledgementSheet({
           </div>
           <SheetDescription className="text-xs text-left leading-relaxed">
             {description}
+            <span className="block mt-2 text-slate-600">
+              First of three readiness steps on this job: route, then start work, then the work timer.
+            </span>
             {jobLabel ? <span className="block mt-2 font-semibold text-slate-700">{jobLabel}</span> : null}
           </SheetDescription>
         </SheetHeader>

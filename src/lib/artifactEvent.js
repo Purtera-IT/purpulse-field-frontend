@@ -76,7 +76,10 @@ function pickKeys(obj, keys) {
 }
 
 /**
- * Minimal job context for artifact payloads (project_id / site_id for joins).
+ * Fetches minimal job row context (project_id / site_id) for canonical payloads.
+ * Reused beyond artifact_event (closeout, feedback, escalation, etc.); the name is historical.
+ * TECHNICAL_DEBT: consider a neutral export alias (e.g. fetchJobContextForCanonicalEvent) if reuse grows.
+ *
  * @param {string} jobId
  * @returns {Promise<{ id: string, project_id?: string, site_id?: string }>}
  */

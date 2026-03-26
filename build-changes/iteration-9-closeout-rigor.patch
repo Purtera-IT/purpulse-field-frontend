@@ -1,0 +1,577 @@
+diff --git a/build-changes/README.md b/build-changes/README.md
+index 0804c58..081ed1a 100644
+--- a/build-changes/README.md
++++ b/build-changes/README.md
+@@ -330,8 +330,8 @@ Shared **Tailwind class tokens** (`fieldVisualTokens`) and a small **`FieldSecti
+ | -------- | ---- |
+ | **`FIELD_MAX_WIDTH`**, **`FIELD_PAGE_PAD_X`**, **`FIELD_PAGE_PAD_Y`** | Page column width and padding (aligned list + detail). |
+ | **`FIELD_STACK_GAP`**, **`FIELD_INNER_STACK`** | Vertical rhythm between major sections vs inside cards. |
+-| **`FIELD_OVERLINE`**, **`FIELD_OVERLINE_STRONG`** | Section eyebrows (10px, uppercase, slate). |
+-| **`FIELD_SECTION_TITLE`**, **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | In-card titles, body, secondary lines, mono IDs. |
++| **`FIELD_OVERLINE`** | Section eyebrows (10px, uppercase, slate). |
++| **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | Body, secondary lines, mono IDs. |
+ | **`FIELD_CARD`**, **`FIELD_CARD_HEADER`**, **`FIELD_CARD_BODY`** | Default white card shell + titled header band + body padding. |
+ | **`FIELD_SURFACE_MUTED`**, **`FIELD_SURFACE_WARNING`** | Secondary dashed panels; escalation / strong attention (amber). |
+ | **`BTN_PRIMARY`**, **`BTN_SECONDARY`**, **`BTN_DANGER`** | Named CTA fragments (slate / outline / red). |
+@@ -411,7 +411,11 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ `git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
+ 
+-### Deferred / Iteration 7 ideas
++### Iteration 6.1 (small cleanup, same canonical scope)
++
++- Dropped unused **`FIELD_OVERLINE_STRONG`** / **`FIELD_SECTION_TITLE`** tokens; tightened **JobOverview** and **PreJobToolCheckModal** operator copy; **FieldJobs** filter chips use bordered inactive state for contrast; **Evidence** thumbnails use slightly calmer QC/record overlays.
++
++### Deferred (Iteration 9+)
+ 
+ - Global theme, dark mode, animation polish, legacy pages.
+ - **`fj-blockers`** strip on job detail + read-only open escalations in Comms.
+@@ -419,7 +423,176 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ ---
+ 
++## Iteration 7 — Readiness + acknowledgement rigor (canonical path)
++
++Honest **Route → Start work → Work timer** readiness on **Overview** (`buildFieldReadinessSummary`), shared **`READINESS_SHORT_LINES`** for header next-step copy, lifecycle/timer framing, pre-job dialog outside-dismiss prevention, acknowledgement sheet operator copy. **No** shell, telemetry/Azure, or new job schema fields.
++
++Longer context: **[`iteration-7-readiness-rigor.md`](./iteration-7-readiness-rigor.md)**.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while these paths are **untracked**; once committed, fold them into **`git diff HEAD --`** only)
++
++- `src/lib/fieldReadinessViewModel.ts`
++- `src/lib/__tests__/fieldReadinessViewModel.test.ts`
++- `src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++**Modified**
++
++- `src/components/fieldv2/JobOverview.jsx`
++- `src/components/fieldv2/jobExecutionNextStep.js`
++- `src/components/fieldv2/JobStateTransitioner.jsx`
++- `src/components/fieldv2/FieldTimeTracker.jsx`
++- `src/components/fieldv2/PreJobToolCheckModal.jsx`
++- `src/components/field/AcknowledgementSheets.jsx`
++
++### Patch
++
++**[`iteration-7-readiness-rigor.patch`](./iteration-7-readiness-rigor.patch)**
++
++Re-run from the **repository root** to refresh ( **`git diff --no-index`** exits **1** when there are changes — append with **`|| true`** or run in a subshell):
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobOverview.jsx \
++    src/components/fieldv2/jobExecutionNextStep.js \
++    src/components/fieldv2/JobStateTransitioner.jsx \
++    src/components/fieldv2/FieldTimeTracker.jsx \
++    src/components/fieldv2/PreJobToolCheckModal.jsx \
++    src/components/field/AcknowledgementSheets.jsx
++  git diff --no-index /dev/null src/lib/fieldReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldReadinessViewModel.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/ReadinessSummaryCard.jsx || true
++} > build-changes/iteration-7-readiness-rigor.patch
++```
++
++Once the three **new** files are **tracked**, replace the three **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/fieldReadinessViewModel.ts src/lib/__tests__/fieldReadinessViewModel.test.ts src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++and merge into a single **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–6 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-7-readiness-rigor.patch
++git apply build-changes/iteration-7-readiness-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 8 — Runbook execution rigor (canonical path)
++
++Canonical **Runbook** tab is driven **only** by **`job.runbook_phases`** (no template list). Real **progress** from job-backed steps; **pass/fail** persists via **`mergeRunbookStepOutcome`** + **`base44.entities.Job.update`** after **`emitRunbookStepEvent`**, aligned with **[`RunbookView.jsx`](../src/components/field/RunbookView.jsx)** (`completed` + `result` including **`fail`** for legacy display). **Session-only** “Running” until complete/fail; **phase gating** matches RunbookView; **evidence** row shows linked count or **None linked**; failed steps link to **Comms**; **closeout** banner when runbook incomplete. **`runbookExecutionViewModel.ts`** holds pure ordering/gating/progress/merge helpers.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, use **`git diff HEAD --`** for those paths only)
++
++- `src/lib/runbookExecutionViewModel.ts`
++- `src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/RunbookSteps.jsx`
++- `src/pages/FieldJobDetail.jsx`
++- `src/components/field/RunbookView.jsx` — **`RESULT_CFG.fail`** + **`stepResult`** handles **`result: 'fail'`** (fieldv2 persistence alignment)
++
++### Patch
++
++**[`iteration-8-runbook-rigor.patch`](./iteration-8-runbook-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/field/RunbookView.jsx \
++    src/components/fieldv2/RunbookSteps.jsx \
++    src/pages/FieldJobDetail.jsx
++  git diff --no-index /dev/null src/lib/runbookExecutionViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/runbookExecutionViewModel.test.ts || true
++} > build-changes/iteration-8-runbook-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/runbookExecutionViewModel.ts src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–7 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-8-runbook-rigor.patch
++git apply build-changes/iteration-8-runbook-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** tree matches the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 9 — Closeout rigor & completion gating (canonical path)
++
++Closeout is an **operational checkpoint**: explicit **readiness summary** (`ready` / `blocked` / `review_suggested` for checklist-derived states), a **truthful checklist** tied to `canTransition` (work-complete + submit gates), **`job.evidence_requirements`** via `partitionEvidenceForRequirements`, **runbook** state, **sign-off** as one row (not the whole tab), **timer** (`workSegmentOpen`) and **Blocker** records (open/acknowledged ≠ resolved). **Action links** jump to Runbook, Evidence, Comms, Overview, or focus/scroll to sign-off. **Audit** stays secondary. **Job state → Complete work** copy nudges technicians to check Closeout first (no new backend lockouts).
++
++**Technical debt:** `FieldJobDetail` still loads blockers via `base44.entities.Blocker.filter` — should move behind `apiClient` / `jobRepository` when you add a canonical API path (keep `['blockers', jobId]` in sync with `BlockerForm`).
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, fold into **`git diff HEAD --`**)
++
++- `src/lib/closeoutReadinessViewModel.ts`
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/JobCloseoutSection.jsx`
++- `src/pages/FieldJobDetail.jsx` — `blockers` query (`base44.entities.Blocker.filter`), invalidate, props to Closeout
++- `src/components/fieldv2/JobStateTransitioner.jsx` — Closeout checklist hint on **Complete work**
++
++### Patch
++
++**[`iteration-9-closeout-rigor.patch`](./iteration-9-closeout-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobCloseoutSection.jsx \
++    src/pages/FieldJobDetail.jsx \
++    src/components/fieldv2/JobStateTransitioner.jsx
++  git diff --no-index /dev/null src/lib/closeoutReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/closeoutReadinessViewModel.test.ts || true
++} > build-changes/iteration-9-closeout-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/closeoutReadinessViewModel.ts src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–8 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-9-closeout-rigor.patch
++git apply build-changes/iteration-9-closeout-rigor.patch
++```
++
++---
++
+ ## Adding future iterations
+ 
+ 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).
+-2. Append a new section to this README with the file list and patch name.
++2. Append a new section to this README with the file list and patch name (and optionally a standalone **`iteration-N-<short-name>.md`** like Iteration 7).
+diff --git a/src/components/fieldv2/JobCloseoutSection.jsx b/src/components/fieldv2/JobCloseoutSection.jsx
+index 051f1eb..4eaa183 100644
+--- a/src/components/fieldv2/JobCloseoutSection.jsx
++++ b/src/components/fieldv2/JobCloseoutSection.jsx
+@@ -1,61 +1,194 @@
+ /**
+- * Closeout — sign-off, final validation, audit/history (secondary).
+- * Lifecycle transitions live on Overview (JobStateTransitioner).
++ * Closeout — readiness checklist (gated, truthful), sign-off, audit/history (secondary).
++ * Lifecycle transitions stay on Overview (JobStateTransitioner).
+  */
+-import React from 'react';
++import React, { useMemo } from 'react';
+ import { useQueryClient } from '@tanstack/react-query';
++import { CheckCircle2, AlertCircle, Info, ChevronRight } from 'lucide-react';
+ import AuditTab from './AuditTab';
+ import SignoffCapture from '@/components/field/SignoffCapture';
+ import { cn } from '@/lib/utils';
+-import { FIELD_CARD, FIELD_OVERLINE, FIELD_SURFACE_MUTED } from '@/lib/fieldVisualTokens';
++import { deriveTimerSessionFromTimeEntries } from '@/lib/fieldJobExecutionModel';
++import { buildCloseoutReadinessSummary } from '@/lib/closeoutReadinessViewModel';
++import {
++  FIELD_CARD,
++  FIELD_CTRL_H,
++  FIELD_LINK_PRIMARY,
++  FIELD_META,
++  FIELD_OVERLINE,
++  FIELD_SURFACE_MUTED,
++} from '@/lib/fieldVisualTokens';
++
++function ChecklistRow({ item, onNavigate }) {
++  const showWarn = !item.met && item.kind === 'blocking';
++  const showAttention = item.kind === 'attention' && !item.met;
++
++  return (
++    <div
++      className={cn(
++        'flex gap-3 rounded-lg border px-3 py-2.5',
++        showWarn && 'border-red-200 bg-red-50/60',
++        item.met && item.kind === 'blocking' && 'border-emerald-200 bg-emerald-50/50',
++        item.met && item.kind === 'info' && 'border-slate-100 bg-slate-50/80',
++        showAttention && 'border-amber-200 bg-amber-50/50',
++        item.kind === 'info' && item.met && 'border-slate-100 bg-slate-50/40'
++      )}
++    >
++      <div className="pt-0.5 flex-shrink-0">
++        {item.met ? (
++          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden />
++        ) : showAttention ? (
++          <AlertCircle className="h-4 w-4 text-amber-600" aria-hidden />
++        ) : item.kind === 'info' ? (
++          <Info className="h-4 w-4 text-slate-400" aria-hidden />
++        ) : (
++          <AlertCircle className="h-4 w-4 text-red-600" aria-hidden />
++        )}
++      </div>
++      <div className="min-w-0 flex-1">
++        <p className="text-xs font-bold text-slate-900 leading-snug">{item.label}</p>
++        <p className={cn(FIELD_META, 'mt-1 leading-snug')}>{item.detail}</p>
++        {item.actionLabel && item.navigateTo && onNavigate ? (
++          <button
++            type="button"
++            onClick={() => onNavigate(item.navigateTo)}
++            className={cn(FIELD_LINK_PRIMARY, 'inline-flex items-center gap-1 mt-2 text-xs font-bold', FIELD_CTRL_H)}
++          >
++            {item.actionLabel}
++            <ChevronRight className="h-3 w-3" aria-hidden />
++          </button>
++        ) : null}
++      </div>
++    </div>
++  );
++}
+ 
+ export default function JobCloseoutSection({
+   job,
++  evidence = [],
++  runbookComplete = false,
++  timeEntries = [],
++  blockers = [],
+   auditLogs,
+   onRefresh,
++  onNavigateToSection,
+ }) {
+   const qc = useQueryClient();
+ 
++  const workSegmentOpen = useMemo(
++    () => deriveTimerSessionFromTimeEntries(timeEntries).workSegmentOpen,
++    [timeEntries]
++  );
++
++  const readiness = useMemo(
++    () =>
++      buildCloseoutReadinessSummary({
++        job,
++        evidence,
++        runbookComplete,
++        workSegmentOpen,
++        blockers,
++      }),
++    [job, evidence, runbookComplete, workSegmentOpen, blockers]
++  );
++
+   const showSignoff = job.status === 'pending_closeout' && !job.signoff_signature_url;
+ 
++  const navigate = (section) => {
++    if (section === 'closeout') {
++      requestAnimationFrame(() => {
++        const el = document.getElementById('closeout-signoff-anchor');
++        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
++        if (el && typeof el.focus === 'function') {
++          try {
++            el.focus({ preventScroll: true });
++          } catch {
++            el.focus();
++          }
++        }
++      });
++      return;
++    }
++    onNavigateToSection?.(section);
++  };
++
++  const summaryStyles = (() => {
++    const active = job.status === 'in_progress' || job.status === 'pending_closeout';
++    if (!active) return 'border-slate-200 bg-white';
++    if (readiness.overall === 'ready') return 'border-emerald-200 bg-emerald-50/40';
++    if (readiness.overall === 'blocked') return 'border-amber-200 bg-amber-50/30';
++    if (readiness.overall === 'review_suggested') return 'border-slate-200 bg-slate-50/80';
++    return 'border-slate-200 bg-white';
++  })();
++
+   return (
+     <div className="space-y-6">
+       <div>
+-        <p className={cn(FIELD_OVERLINE, 'mb-1')}>
+-          Closeout
+-        </p>
++        <p className={cn(FIELD_OVERLINE, 'mb-1')}>Closeout</p>
+         <p className="text-xs text-slate-600 leading-snug">
+-          Use Overview to move the job into closeout when work is complete. Here: sign-off, then activity
+-          for reference.
++          Final operational checkpoint: readiness, sign-off, then activity for reference. Complete work and submit
++          closeout from <strong className="font-semibold text-slate-700">Overview</strong> (Job state).
+         </p>
+       </div>
+ 
+-      {showSignoff && (
+-        <div className={cn(FIELD_CARD, 'p-4')}>
+-          <SignoffCapture
+-            job={job}
+-            onComplete={() => {
+-              qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
+-              onRefresh?.();
+-            }}
+-          />
+-        </div>
+-      )}
++      <div className={cn(FIELD_CARD, 'p-4 border-2', summaryStyles)}>
++        <p className="text-sm font-bold text-slate-900 leading-tight">{readiness.headline}</p>
++        {readiness.subline ? (
++          <p className={cn(FIELD_META, 'mt-2 leading-snug')}>{readiness.subline}</p>
++        ) : null}
++        {readiness.checks.length > 0 ? (
++          <div className="mt-4 space-y-2" aria-label="Closeout readiness checklist">
++            <p className={cn(FIELD_OVERLINE, 'text-[10px]')}>Checklist</p>
++            {readiness.checks.map((item) => (
++              <ChecklistRow key={item.id} item={item} onNavigate={navigate} />
++            ))}
++          </div>
++        ) : null}
++      </div>
+ 
+-      {job.status === 'pending_closeout' && job.signoff_signature_url && (
+-        <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+-          Sign-off is on file for this job.
++      {/* Sign-off is one readiness criterion, not the whole section */}
++      <div
++        id="closeout-signoff-anchor"
++        className="scroll-mt-24 outline-none rounded-lg"
++        tabIndex={-1}
++        role="region"
++        aria-label="Sign-off"
++      >
++        <p className={cn(FIELD_OVERLINE, 'mb-2')}>Sign-off</p>
++        <p className={cn(FIELD_META, 'mb-3 leading-snug')}>
++          {job.status === 'pending_closeout'
++            ? 'Required for this job, together with the checklist above, before you submit closeout from Job state.'
++            : 'When the job is in pending closeout, capture customer sign-off here.'}
+         </p>
+-      )}
++        {showSignoff && (
++          <div className={cn(FIELD_CARD, 'p-4')}>
++            <SignoffCapture
++              job={job}
++              onComplete={() => {
++                qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
++                onRefresh?.();
++              }}
++            />
++          </div>
++        )}
+ 
+-      <div className="pt-4 mt-2 border-t border-slate-200/90">
+-        <div className={cn(FIELD_SURFACE_MUTED, 'p-3')}>
+-          <p className={cn(FIELD_OVERLINE, 'mb-2')}>
+-            Activity on this job
++        {job.status === 'pending_closeout' && job.signoff_signature_url && (
++          <p className="text-xs text-emerald-800 font-semibold bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
++            Sign-off is on file — when the checklist is clear, submit closeout from Job state.
+           </p>
+-          <p className="text-[11px] text-slate-500 mb-3">
+-            Audit events and system actions (when synced from the server).
++        )}
++
++        {job.status !== 'pending_closeout' && (
++          <p className={cn(FIELD_SURFACE_MUTED, 'text-xs text-slate-600 rounded-lg px-3 py-2 border border-slate-100')}>
++            Sign-off capture unlocks when the job is in <strong className="font-semibold">Pending closeout</strong>.
+           </p>
++        )}
++      </div>
++
++      <div className="pt-4 mt-2 border-t border-slate-200/90">
++        <div className={cn(FIELD_SURFACE_MUTED, 'p-3 opacity-95')}>
++          <p className={cn(FIELD_OVERLINE, 'mb-2')}>Activity on this job</p>
++          <p className="text-[11px] text-slate-500 mb-3">Secondary reference — audit when synced from the server.</p>
+           <AuditTab auditLogs={auditLogs} />
+         </div>
+       </div>
+diff --git a/src/components/fieldv2/JobStateTransitioner.jsx b/src/components/fieldv2/JobStateTransitioner.jsx
+index 6cd342c..8ff3bdd 100644
+--- a/src/components/fieldv2/JobStateTransitioner.jsx
++++ b/src/components/fieldv2/JobStateTransitioner.jsx
+@@ -23,6 +23,11 @@ import PreJobToolCheckModal from './PreJobToolCheckModal';
+ import { EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
+ import { BTN_SECONDARY, FIELD_CARD, FIELD_CTRL_H, FIELD_META } from '@/lib/fieldVisualTokens';
+ 
++const READINESS_HINT_EN_ROUTE =
++  'You will confirm travel / ETA details before the job moves to en route.';
++const READINESS_HINT_START_WORK =
++  'A short pre-start checklist runs before the job moves to in progress.';
++
+ function RequirementItem({ requirement, blocker }) {
+   const status = blocker?.isMet ? 'met' : 'unmet';
+   return (
+@@ -242,7 +247,28 @@ export default function JobStateTransitioner({
+                         → {targetLabel.label}
+                       </span>
+                     </div>
+-                    <p className="text-xs text-slate-600 mb-2">{description}</p>
++                    <p
++                      className={cn(
++                        'text-xs text-slate-600',
++                        to === 'en_route' || (to === 'in_progress' && currentStatus !== 'paused')
++                          ? 'mb-1'
++                          : 'mb-2'
++                      )}
++                    >
++                      {description}
++                    </p>
++                    {to === 'en_route' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_EN_ROUTE}</p>
++                    ) : null}
++                    {to === 'in_progress' && currentStatus !== 'paused' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_START_WORK}</p>
++                    ) : null}
++                    {to === 'pending_closeout' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>
++                        Open the <strong className="font-semibold text-slate-700">Closeout</strong> tab first — it
++                        lists what is still missing before you should mark work complete.
++                      </p>
++                    ) : null}
+ 
+                     {/* Blockers */}
+                     {gate.blockers.length > 0 && (
+diff --git a/src/pages/FieldJobDetail.jsx b/src/pages/FieldJobDetail.jsx
+index c57043f..19840e5 100644
+--- a/src/pages/FieldJobDetail.jsx
++++ b/src/pages/FieldJobDetail.jsx
+@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
+ import { ArrowLeft, Loader2 } from 'lucide-react';
+ import { cn } from '@/lib/utils';
+ import { apiClient } from '@/api/client';
++import { base44 } from '@/api/base44Client';
+ import { jobRepository } from '@/lib/repositories/jobRepository';
+ import { useAuth } from '@/lib/AuthContext';
+ import {
+@@ -21,6 +22,7 @@ import {
+   deriveTimerSessionFromTimeEntries,
+   formatWorkedDuration,
+ } from '@/lib/fieldJobExecutionModel';
++import { isRunbookComplete } from '@/lib/runbookExecutionViewModel';
+ import {
+   FIELD_MAX_WIDTH,
+   FIELD_META,
+@@ -172,6 +174,18 @@ export default function FieldJobDetail() {
+     enabled: false,
+   });
+ 
++  /*
++   * TECHNICAL_DEBT (Iteration 10+): Escalation/blocker list uses base44.entities.Blocker.filter directly.
++   * Canonical field-v2 data access should converge on jobRepository / apiClient (or a small repository) like
++   * evidence and time entries. Keep queryKey ['blockers', jobId] aligned with BlockerForm invalidation.
++   */
++  const { data: blockers = [] } = useQuery({
++    queryKey: ['blockers', jobId],
++    queryFn: () => (jobId ? base44.entities.Blocker.filter({ job_id: jobId }) : Promise.resolve([])),
++    enabled: !!jobId,
++    staleTime: 15_000,
++  });
++
+   const invalidateAll = () => {
+     [
+       'fj-job',
+@@ -182,6 +196,7 @@ export default function FieldJobDetail() {
+       'fj-audit',
+       'fj-time-entries',
+     ].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
++    qc.invalidateQueries({ queryKey: ['blockers', jobId] });
+   };
+ 
+   if (!jobId) {
+@@ -225,6 +240,8 @@ export default function FieldJobDetail() {
+     );
+   }
+ 
++  const runbookComplete = isRunbookComplete(job.runbook_phases);
++
+   const tabProps = {
+     job,
+     evidence,
+@@ -233,11 +250,11 @@ export default function FieldJobDetail() {
+     activities,
+     auditLogs,
+     onRefresh: invalidateAll,
++    runbookComplete,
++    onNavigateToSection: setSection,
+   };
+ 
+   const nextStep = getNextStepMessage(job, evidence);
+-  const runbookComplete =
+-    job.runbook_phases?.every((phase) => phase.steps?.every((step) => step.completed)) ?? false;
+   const hasSignature = !!job.signoff_signature_url;
+ 
+   const headerWorked = formatWorkedDuration(executionView.timer.workedSeconds);
+@@ -328,15 +345,22 @@ export default function FieldJobDetail() {
+               {...tabProps}
+               timeEntries={timeEntries}
+               executionView={executionView}
+-              onNavigateToSection={setSection}
+-              runbookComplete={runbookComplete}
+               hasSignature={hasSignature}
+             />
+           )}
+           {section === 'runbook' && <RunbookSteps {...tabProps} />}
+           {section === 'evidence' && <EvidenceGalleryView {...tabProps} />}
+           {section === 'closeout' && (
+-            <JobCloseoutSection job={job} auditLogs={auditLogs} onRefresh={invalidateAll} />
++            <JobCloseoutSection
++              job={job}
++              evidence={evidence}
++              runbookComplete={runbookComplete}
++              timeEntries={timeEntries}
++              blockers={blockers}
++              auditLogs={auditLogs}
++              onRefresh={invalidateAll}
++              onNavigateToSection={setSection}
++            />
+           )}
+           {section === 'comms' && <JobCommsSection {...tabProps} />}
+         </div>

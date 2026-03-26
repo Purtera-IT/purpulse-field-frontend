@@ -1,0 +1,1516 @@
+diff --git a/build-changes/README.md b/build-changes/README.md
+index 0804c58..3918a90 100644
+--- a/build-changes/README.md
++++ b/build-changes/README.md
+@@ -330,8 +330,8 @@ Shared **Tailwind class tokens** (`fieldVisualTokens`) and a small **`FieldSecti
+ | -------- | ---- |
+ | **`FIELD_MAX_WIDTH`**, **`FIELD_PAGE_PAD_X`**, **`FIELD_PAGE_PAD_Y`** | Page column width and padding (aligned list + detail). |
+ | **`FIELD_STACK_GAP`**, **`FIELD_INNER_STACK`** | Vertical rhythm between major sections vs inside cards. |
+-| **`FIELD_OVERLINE`**, **`FIELD_OVERLINE_STRONG`** | Section eyebrows (10px, uppercase, slate). |
+-| **`FIELD_SECTION_TITLE`**, **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | In-card titles, body, secondary lines, mono IDs. |
++| **`FIELD_OVERLINE`** | Section eyebrows (10px, uppercase, slate). |
++| **`FIELD_BODY`**, **`FIELD_META`**, **`FIELD_META_MONO`** | Body, secondary lines, mono IDs. |
+ | **`FIELD_CARD`**, **`FIELD_CARD_HEADER`**, **`FIELD_CARD_BODY`** | Default white card shell + titled header band + body padding. |
+ | **`FIELD_SURFACE_MUTED`**, **`FIELD_SURFACE_WARNING`** | Secondary dashed panels; escalation / strong attention (amber). |
+ | **`BTN_PRIMARY`**, **`BTN_SECONDARY`**, **`BTN_DANGER`** | Named CTA fragments (slate / outline / red). |
+@@ -411,7 +411,11 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ `git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
+ 
+-### Deferred / Iteration 7 ideas
++### Iteration 6.1 (small cleanup, same canonical scope)
++
++- Dropped unused **`FIELD_OVERLINE_STRONG`** / **`FIELD_SECTION_TITLE`** tokens; tightened **JobOverview** and **PreJobToolCheckModal** operator copy; **FieldJobs** filter chips use bordered inactive state for contrast; **Evidence** thumbnails use slightly calmer QC/record overlays.
++
++### Deferred (Iteration 9+)
+ 
+ - Global theme, dark mode, animation polish, legacy pages.
+ - **`fj-blockers`** strip on job detail + read-only open escalations in Comms.
+@@ -419,7 +423,506 @@ git apply build-changes/iteration-6-canonical-field-visual-system.patch
+ 
+ ---
+ 
++## Iteration 7 — Readiness + acknowledgement rigor (canonical path)
++
++Honest **Route → Start work → Work timer** readiness on **Overview** (`buildFieldReadinessSummary`), shared **`READINESS_SHORT_LINES`** for header next-step copy, lifecycle/timer framing, pre-job dialog outside-dismiss prevention, acknowledgement sheet operator copy. **No** shell, telemetry/Azure, or new job schema fields.
++
++Longer context: **[`iteration-7-readiness-rigor.md`](./iteration-7-readiness-rigor.md)**.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while these paths are **untracked**; once committed, fold them into **`git diff HEAD --`** only)
++
++- `src/lib/fieldReadinessViewModel.ts`
++- `src/lib/__tests__/fieldReadinessViewModel.test.ts`
++- `src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++**Modified**
++
++- `src/components/fieldv2/JobOverview.jsx`
++- `src/components/fieldv2/jobExecutionNextStep.js`
++- `src/components/fieldv2/JobStateTransitioner.jsx`
++- `src/components/fieldv2/FieldTimeTracker.jsx`
++- `src/components/fieldv2/PreJobToolCheckModal.jsx`
++- `src/components/field/AcknowledgementSheets.jsx`
++
++### Patch
++
++**[`iteration-7-readiness-rigor.patch`](./iteration-7-readiness-rigor.patch)**
++
++Re-run from the **repository root** to refresh ( **`git diff --no-index`** exits **1** when there are changes — append with **`|| true`** or run in a subshell):
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobOverview.jsx \
++    src/components/fieldv2/jobExecutionNextStep.js \
++    src/components/fieldv2/JobStateTransitioner.jsx \
++    src/components/fieldv2/FieldTimeTracker.jsx \
++    src/components/fieldv2/PreJobToolCheckModal.jsx \
++    src/components/field/AcknowledgementSheets.jsx
++  git diff --no-index /dev/null src/lib/fieldReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldReadinessViewModel.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/ReadinessSummaryCard.jsx || true
++} > build-changes/iteration-7-readiness-rigor.patch
++```
++
++Once the three **new** files are **tracked**, replace the three **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/fieldReadinessViewModel.ts src/lib/__tests__/fieldReadinessViewModel.test.ts src/components/fieldv2/ReadinessSummaryCard.jsx`
++
++and merge into a single **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–6 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-7-readiness-rigor.patch
++git apply build-changes/iteration-7-readiness-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** versions of the modified files match the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 8 — Runbook execution rigor (canonical path)
++
++Canonical **Runbook** tab is driven **only** by **`job.runbook_phases`** (no template list). Real **progress** from job-backed steps; **pass/fail** persists via **`mergeRunbookStepOutcome`** + **`base44.entities.Job.update`** after **`emitRunbookStepEvent`**, aligned with **[`RunbookView.jsx`](../src/components/field/RunbookView.jsx)** (`completed` + `result` including **`fail`** for legacy display). **Session-only** “Running” until complete/fail; **phase gating** matches RunbookView; **evidence** row shows linked count or **None linked**; failed steps link to **Comms**; **closeout** banner when runbook incomplete. **`runbookExecutionViewModel.ts`** holds pure ordering/gating/progress/merge helpers.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, use **`git diff HEAD --`** for those paths only)
++
++- `src/lib/runbookExecutionViewModel.ts`
++- `src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/RunbookSteps.jsx`
++- `src/pages/FieldJobDetail.jsx`
++- `src/components/field/RunbookView.jsx` — **`RESULT_CFG.fail`** + **`stepResult`** handles **`result: 'fail'`** (fieldv2 persistence alignment)
++
++### Patch
++
++**[`iteration-8-runbook-rigor.patch`](./iteration-8-runbook-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/field/RunbookView.jsx \
++    src/components/fieldv2/RunbookSteps.jsx \
++    src/pages/FieldJobDetail.jsx
++  git diff --no-index /dev/null src/lib/runbookExecutionViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/runbookExecutionViewModel.test.ts || true
++} > build-changes/iteration-8-runbook-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/runbookExecutionViewModel.ts src/lib/__tests__/runbookExecutionViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–7 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-8-runbook-rigor.patch
++git apply build-changes/iteration-8-runbook-rigor.patch
++```
++
++`git apply --check` only succeeds when the **pre-patch** tree matches the patch context. Re-generate or use `git apply --3way` if your tree has diverged.
++
++---
++
++## Iteration 9 — Closeout rigor & completion gating (canonical path)
++
++Closeout is an **operational checkpoint**: explicit **readiness summary** (`ready` / `blocked` / `review_suggested` for checklist-derived states), a **truthful checklist** tied to `canTransition` (work-complete + submit gates), **`job.evidence_requirements`** via `partitionEvidenceForRequirements`, **runbook** state, **sign-off** as one row (not the whole tab), **timer** (`workSegmentOpen`) and **Blocker** records (open/acknowledged ≠ resolved). **Action links** jump to Runbook, Evidence, Comms, Overview, or focus/scroll to sign-off. **Audit** stays secondary. **Job state → Complete work** copy nudges technicians to check Closeout first (no new backend lockouts).
++
++**Technical debt:** `FieldJobDetail` still loads blockers via `base44.entities.Blocker.filter` — should move behind `apiClient` / `jobRepository` when you add a canonical API path (keep `['blockers', jobId]` in sync with `BlockerForm`).
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** below while **untracked**; once committed, fold into **`git diff HEAD --`**)
++
++- `src/lib/closeoutReadinessViewModel.ts`
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/JobCloseoutSection.jsx`
++- `src/pages/FieldJobDetail.jsx` — `blockers` query (`base44.entities.Blocker.filter`), invalidate, props to Closeout
++- `src/components/fieldv2/JobStateTransitioner.jsx` — Closeout checklist hint on **Complete work**
++
++### Patch
++
++**[`iteration-9-closeout-rigor.patch`](./iteration-9-closeout-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/fieldv2/JobCloseoutSection.jsx \
++    src/pages/FieldJobDetail.jsx \
++    src/components/fieldv2/JobStateTransitioner.jsx
++  git diff --no-index /dev/null src/lib/closeoutReadinessViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/closeoutReadinessViewModel.test.ts || true
++} > build-changes/iteration-9-closeout-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/closeoutReadinessViewModel.ts src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++and merge into one **`git diff HEAD -- …`** block.
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–8 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-9-closeout-rigor.patch
++git apply build-changes/iteration-9-closeout-rigor.patch
++```
++
++---
++
++## Iteration 10 — QC & review-loop rigor (canonical Evidence path)
++
++**`evidenceQcViewModel.ts`** normalizes `qc_status` strings (`pass` / `passed` / `approved`, `fail` / `rejected`, etc.) into **pass | fail | pending**, rolls up counts for **uploaded** files only, and drives presentation copy. **Evidence** tab: **QC on saved files** summary strip (tight copy: saved vs QC outcome), **PASS | FAIL | REVIEW** pills on thumbnails (pending = review not recorded), **geo** pin top-right and **QC** pill bottom-right to reduce overlay clutter, section headers show **QC fail** counts when relevant, detail modal separates **file on job** vs **QC** with **Mark QC pass/fail**, failed-QC **replacement** CTA, and metadata rows. **Closeout** (`in_progress` + `pending_closeout`): **attention** row when any uploaded evidence is **QC fail** — operational wording (“may need replacement”), no backend lockout. Tests: `evidenceQcViewModel.test.ts`, extended `closeoutReadinessViewModel.test.ts`.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
++
++- `src/lib/evidenceQcViewModel.ts`
++- `src/lib/__tests__/evidenceQcViewModel.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/EvidenceGalleryView.jsx`
++- `src/lib/fieldEvidenceViewModel.ts` — `qc_status` on `EvidenceLike`
++- `src/lib/closeoutReadinessViewModel.ts` — QC-fail evidence attention row
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++
++### Patch
++
++**[`iteration-10-qc-review-rigor.patch`](./iteration-10-qc-review-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/fieldEvidenceViewModel.ts \
++    src/lib/closeoutReadinessViewModel.ts \
++    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
++    src/components/fieldv2/EvidenceGalleryView.jsx
++  git diff --no-index /dev/null src/lib/evidenceQcViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/evidenceQcViewModel.test.ts || true
++} > build-changes/iteration-10-qc-review-rigor.patch
++```
++
++Once the two **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/evidenceQcViewModel.ts src/lib/__tests__/evidenceQcViewModel.test.ts`
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–9 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-10-qc-review-rigor.patch
++git apply build-changes/iteration-10-qc-review-rigor.patch
++```
++
++---
++
++## Iteration 11 — Technician closeout outcome & feedback
++
++**`fieldCloseoutFeedbackViewModel.ts`** owns job update payload, `feedback_event` mapping (`feedback_source: 'closeout'`, complaint flag from outcome triad and/or explicit checkbox), and hydration from the job row. **Closeout** tab: **`JobCloseoutOutcomePanel`** (after readiness card, before sign-off) with triad **clean / concerns / problematic**, optional **1–5** rating, **complaint** / **compliment** flags, **notes**; **`Job.update` first**, then **`emitFeedbackEvent`** on success; read-only summary on **submitted / approved / rejected** when data exists. **Readiness** (`pending_closeout`): **info** checklist row + **`closeout_outcome`** deep-link scroll (`closeout-technician-outcome-anchor`). **Job schema**: six optional **`technician_closeout_*`** fields in **`api/types.ts`** and **`lib/types`**. Tests: **`fieldCloseoutFeedbackViewModel.test.ts`**, extended **`closeoutReadinessViewModel.test.ts`**.
++
++### Changed file list
++
++**New** (use **`git diff --no-index`** while untracked; then fold into **`git diff HEAD --`**)
++
++- `src/lib/fieldCloseoutFeedbackViewModel.ts`
++- `src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts`
++- `src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
++
++**Modified**
++
++- `src/api/types.ts` — `JobSchema` technician closeout fields
++- `src/lib/types/index.ts` — `Job` interface
++- `src/lib/closeoutReadinessViewModel.ts` — `CloseoutNavSection`, info row
++- `src/lib/__tests__/closeoutReadinessViewModel.test.ts`
++- `src/components/fieldv2/JobCloseoutSection.jsx` — panel + `closeout_outcome` scroll
++
++### Patch
++
++**[`iteration-11-outcome-feedback.patch`](./iteration-11-outcome-feedback.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/api/types.ts \
++    src/lib/types/index.ts \
++    src/lib/closeoutReadinessViewModel.ts \
++    src/lib/__tests__/closeoutReadinessViewModel.test.ts \
++    src/components/fieldv2/JobCloseoutSection.jsx
++  git diff --no-index /dev/null src/lib/fieldCloseoutFeedbackViewModel.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/JobCloseoutOutcomePanel.jsx || true
++} > build-changes/iteration-11-outcome-feedback.patch
++```
++
++Once the **new** files are **tracked**, replace the **`--no-index`** lines with:
++
++`git diff HEAD -- src/lib/fieldCloseoutFeedbackViewModel.ts src/lib/__tests__/fieldCloseoutFeedbackViewModel.test.ts src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–10 (or equivalent):
++
++```bash
++git apply --check build-changes/iteration-11-outcome-feedback.patch
++git apply build-changes/iteration-11-outcome-feedback.patch
++```
++
++### Iteration 11.1 — Closeout outcome polish (after 11)
++
++Small UX copy and presentation pass: triad buttons drop **`FIELD_CTRL_H`** for natural vertical sizing; checkbox and intro copy are operator-facing; read-only **saved** time uses **`date-fns`** (`MMM d, yyyy · h:mm a`, aligned with other field timestamps); readiness row copy is explicitly **informational** (recommended / not required to submit / does not block handoff).
++
++**Patch:** [`iteration-11.1-closeout-outcome-polish.patch`](./iteration-11.1-closeout-outcome-polish.patch) — apply after Iteration 11.
++
++```bash
++git apply --check build-changes/iteration-11.1-closeout-outcome-polish.patch
++git apply build-changes/iteration-11.1-closeout-outcome-polish.patch
++```
++
++---
++
++## Iteration 12 — Job context snapshot rigor (canonical field path)
++
++**`jobContextField.js`:** explicit **`extractJobContextFingerprintMaterial`** + **`buildRunbookStructureKey`**; fingerprint **`JOB_CONTEXT_SCHEMA_VERSION` `1.2.0`** — adds **`project_id` / `site_id`** and sorted phase:step **`rb_sig`**; drops noisy **`updated_date`**; module doc lists fingerprint vs payload. **`emitJobContextFieldIfChanged`** chains concurrent work per **`job_id`**. **[`FieldJobDetail.jsx`](../src/pages/FieldJobDetail.jsx):** `job` / `user` via refs; **`useEffect`** deps **`jobId` + `contextDedupeKey` + `techKey`** only (no refetch churn). Tests: **`fieldJobContextSnapshot.test.ts`**.
++
++### Changed file list
++
++**New**
++
++- `src/lib/__tests__/fieldJobContextSnapshot.test.ts`
++
++**Modified**
++
++- `src/lib/jobContextField.js`
++- `src/pages/FieldJobDetail.jsx`
++- `docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md` (job context fingerprint description)
++
++### Patch
++
++**[`iteration-12-job-context-rigor.patch`](./iteration-12-job-context-rigor.patch)**
++
++Re-run from the **repository root** to refresh:
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/jobContextField.js \
++    src/pages/FieldJobDetail.jsx \
++    docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md \
++    build-changes/README.md
++  git diff --no-index /dev/null src/lib/__tests__/fieldJobContextSnapshot.test.ts || true
++} > build-changes/iteration-12-job-context-rigor.patch
++```
++
++Once the **new** test file is **tracked**, replace the **`--no-index`** line with:
++
++`git diff HEAD -- src/lib/__tests__/fieldJobContextSnapshot.test.ts`
++
++### How to use the patch
++
++From the **repository root**, apply **after** Iterations 1–11 (and 11.1 if used):
++
++```bash
++git apply --check build-changes/iteration-12-job-context-rigor.patch
++git apply build-changes/iteration-12-job-context-rigor.patch
++```
++
++### Iteration 12.1 — Job context polish (after 12)
++
++Documents **blockers query / closeout props** on FieldJobDetail as **carry-through**, not Iteration 12 `job_context_field` scope. **`normalizeJobContextLinkId`** shared by fingerprint material and **`buildJobContextFieldPayload`** so **`project_id` / `site_id`** match dedupe and outbound **`job_context_field`** (Azure schema). Module note: when fingerprint inputs change, bump **`JOB_CONTEXT_SCHEMA_VERSION`**, tests, and planning docs together. **`buildRunbookStructureKey`** comment clarifies index fallback stability.
++
++**Modified:** `src/lib/jobContextField.js`, `src/pages/FieldJobDetail.jsx`, `src/lib/__tests__/fieldJobContextSnapshot.test.ts`, `docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md`, `build-changes/README.md`.
++
++**Patch:** [`iteration-12.1-job-context-polish.patch`](./iteration-12.1-job-context-polish.patch) — apply after Iteration 12.
++
++Re-generate from repo root:
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/jobContextField.js \
++    src/pages/FieldJobDetail.jsx \
++    src/lib/__tests__/fieldJobContextSnapshot.test.ts \
++    docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
++  # plus README hunk for this subsection only (see Iteration 11 README regen pattern)
++} > build-changes/iteration-12.1-job-context-polish.patch
++```
++
++```bash
++git apply --check build-changes/iteration-12.1-job-context-polish.patch
++git apply build-changes/iteration-12.1-job-context-polish.patch
++```
++
++---
++
++## Iteration 13 — Offline / outbox consolidation + sync-state rigor
++
++**Presentation:** [`fieldJobSyncPresentation.ts`](../src/lib/fieldJobSyncPresentation.ts) — shared operator labels for Dexie **queuedEdits**, in-memory **`UploadQueueManager`** (not Dexie `uploadQueue` in jobRepository), and telemetry backlog wording; **`summarizeJobSyncSurface`** drives the job-level summary line.
++
++**Telemetry:** [`getTelemetryQueueDepthForJob`](../src/lib/telemetryQueue.js) — read-only job-scoped depth over `loadAllRows()` (string-matched `envelope.job_id`); **no** flush/backoff changes.
++
++**UI:** [`FieldJobSyncStrip.jsx`](../src/components/fieldv2/FieldJobSyncStrip.jsx) polls ~1.5s, nests [`OfflineEditsIndicator`](../src/components/fieldv2/OfflineEditsIndicator.jsx) + [`UploadProgressIndicator`](../src/components/fieldv2/UploadProgressIndicator.jsx) with **`nested`** styling; [`FieldJobDetail.jsx`](../src/pages/FieldJobDetail.jsx) uses the strip instead of stacking indicators alone. Optional phrase alignment: [`EvidenceGalleryView.jsx`](../src/components/fieldv2/EvidenceGalleryView.jsx) **`EVIDENCE_IN_FLIGHT_PHRASE`**.
++
++**Tests:** [`fieldJobSyncPresentation.test.ts`](../src/lib/__tests__/fieldJobSyncPresentation.test.ts); [`iteration13TelemetryQueue.test.js`](../src/tests/iteration13TelemetryQueue.test.js) adds **`getTelemetryQueueDepthForJob`** cases (existing flush/durability tests unchanged).
++
++### Changed file list
++
++**New**
++
++- `src/lib/fieldJobSyncPresentation.ts`
++- `src/lib/__tests__/fieldJobSyncPresentation.test.ts`
++- `src/components/fieldv2/FieldJobSyncStrip.jsx`
++
++**Modified**
++
++- `src/lib/telemetryQueue.js`
++- `src/tests/iteration13TelemetryQueue.test.js`
++- `src/components/fieldv2/OfflineEditsIndicator.jsx`
++- `src/components/fieldv2/UploadProgressIndicator.jsx`
++- `src/pages/FieldJobDetail.jsx`
++- `src/components/fieldv2/EvidenceGalleryView.jsx` (optional copy)
++- `build-changes/README.md`
++
++### Patch
++
++**[`iteration-13-sync-outbox-rigor.patch`](./iteration-13-sync-outbox-rigor.patch)**
++
++Re-generate from the **repository root** (after Iteration 13 files are present):
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/telemetryQueue.js \
++    src/tests/iteration13TelemetryQueue.test.js \
++    src/components/fieldv2/OfflineEditsIndicator.jsx \
++    src/components/fieldv2/UploadProgressIndicator.jsx
++  git diff --no-index /dev/null src/lib/fieldJobSyncPresentation.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/fieldJobSyncPresentation.test.ts || true
++  git diff --no-index /dev/null src/components/fieldv2/FieldJobSyncStrip.jsx || true
++} > build-changes/iteration-13-sync-outbox-rigor.patch
++```
++
++Then append the **`FieldJobDetail.jsx`** and **`EvidenceGalleryView.jsx`** hunks from this README’s committed patch (or re-apply manually) if your tree already diverged from the Iteration 13 base.
++
++### How to use the patch
++
++From the **repository root**, apply **after** prior iteration patches your branch uses:
++
++```bash
++git apply --check build-changes/iteration-13-sync-outbox-rigor.patch
++git apply build-changes/iteration-13-sync-outbox-rigor.patch
++```
++
++### Iteration 13.1 — Sync strip polish (after 13)
++
++Small follow-up: **document** that `FieldJobSyncStrip` interval polling of Dexie + upload manager + telemetry is **provisional** (prefer subscription-driven updates later). **Wording:** completed upload sessions use **“Upload finished”** (not “file sent”) so operators do not read it as full evidence/QC/server completeness. **Layout:** summary line uses `min-w-0`, `break-words`, and `text-pretty` for narrow viewports.
++
++**Modified:** `src/components/fieldv2/FieldJobSyncStrip.jsx`, `src/lib/fieldJobSyncPresentation.ts`, `src/components/fieldv2/UploadProgressIndicator.jsx`, `src/lib/__tests__/fieldJobSyncPresentation.test.ts`, `build-changes/README.md`.
++
++---
++
++## Iteration 14 — Canonical event-family hardening + emit-before-mutate audit
++
++**Coverage map:** [`canonicalFieldEventCoverage.ts`](../src/lib/canonicalFieldEventCoverage.ts) + [`canonicalFieldEventCoverage.test.ts`](../src/lib/__tests__/canonicalFieldEventCoverage.test.ts) — all 11 Iteration 14 families mapped to emitter modules.
++
++**Closeout flags:** [`closeoutSubmissionFlags.ts`](../src/lib/closeoutSubmissionFlags.ts) + tests — shared with legacy [`CloseoutPreview.jsx`](../src/components/field/CloseoutPreview.jsx) and v2 submit.
++
++**V2 submit (`pending_closeout` → `submitted`):** [`jobStateTransitionMutation.ts`](../src/lib/jobStateTransitionMutation.ts) — **`emitCloseoutEvent`** → **`emitDispatchEventForJobStatusChange`** → **`Job.update`** (same `closeout_submitted_at` as closeout payload). Wired from [`JobStateTransitioner.jsx`](../src/components/fieldv2/JobStateTransitioner.jsx).
++
++**Technician finish outcome:** [`technicianCloseoutOutcomeSave.ts`](../src/lib/technicianCloseoutOutcomeSave.ts) — **`emitFeedbackEvent`** before **`Job.update`**; [`JobCloseoutOutcomePanel.jsx`](../src/components/fieldv2/JobCloseoutOutcomePanel.jsx). [`fieldCloseoutFeedbackViewModel.ts`](../src/lib/fieldCloseoutFeedbackViewModel.ts) — optional **`recordedAtIso`** on **`buildTechnicianCloseoutJobUpdate`**.
++
++**Escalation:** [`BlockerForm.jsx`](../src/components/field/BlockerForm.jsx) — **`emitEscalationEvent`** before **`Blocker.create`** (`escalation_record_id` omitted until a post-create follow-up exists); honest toast if create fails after enqueue.
++
++**Explicit non-changes:** No rewrite of [`telemetryQueue.js`](../src/lib/telemetryQueue.js); artifact/QC remain post-persist emit; travel/arrival on FieldJobDetail overview remains a product follow-up (documented in coverage map).
++
++### Changed file list
++
++**New**
++
++- `src/lib/canonicalFieldEventCoverage.ts`
++- `src/lib/__tests__/canonicalFieldEventCoverage.test.ts`
++- `src/lib/closeoutSubmissionFlags.ts`
++- `src/lib/__tests__/closeoutSubmissionFlags.test.ts`
++- `src/lib/jobStateTransitionMutation.ts`
++- `src/lib/__tests__/jobStateTransitionMutation.test.ts`
++- `src/lib/technicianCloseoutOutcomeSave.ts`
++- `src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts`
++
++**Modified**
++
++- `src/components/fieldv2/JobStateTransitioner.jsx`
++- `src/components/field/CloseoutPreview.jsx`
++- `src/components/fieldv2/JobCloseoutOutcomePanel.jsx`
++- `src/components/field/BlockerForm.jsx`
++- `src/lib/fieldCloseoutFeedbackViewModel.ts`
++- `build-changes/README.md`
++
++### Patch
++
++**[`iteration-14-canonical-events.patch`](./iteration-14-canonical-events.patch)**
++
++Re-generate from the **repository root** (adjust `git diff HEAD` vs `git diff --no-index /dev/null` depending on what is already tracked):
++
++```bash
++{
++  git diff HEAD -- \
++    src/components/field/BlockerForm.jsx \
++    src/components/field/CloseoutPreview.jsx \
++    src/components/fieldv2/JobStateTransitioner.jsx \
++    src/components/fieldv2/JobCloseoutOutcomePanel.jsx \
++    src/lib/fieldCloseoutFeedbackViewModel.ts \
++    build-changes/README.md
++  git diff --no-index /dev/null src/lib/canonicalFieldEventCoverage.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/canonicalFieldEventCoverage.test.ts || true
++  git diff --no-index /dev/null src/lib/closeoutSubmissionFlags.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/closeoutSubmissionFlags.test.ts || true
++  git diff --no-index /dev/null src/lib/jobStateTransitionMutation.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/jobStateTransitionMutation.test.ts || true
++  git diff --no-index /dev/null src/lib/technicianCloseoutOutcomeSave.ts || true
++  git diff --no-index /dev/null src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts || true
++} > build-changes/iteration-14-canonical-events.patch
++```
++
++### How to use the patch
++
++From the **repository root**, apply **after** prior iteration patches your branch uses:
++
++```bash
++git apply --check build-changes/iteration-14-canonical-events.patch
++git apply build-changes/iteration-14-canonical-events.patch
++```
++
++---
++
+ ## Adding future iterations
+ 
+ 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).
+-2. Append a new section to this README with the file list and patch name.
++2. Append a new section to this README with the file list and patch name (and optionally a standalone **`iteration-N-<short-name>.md`** like Iteration 7).
+diff --git a/src/components/field/BlockerForm.jsx b/src/components/field/BlockerForm.jsx
+index b5b7840..d6c2a56 100644
+--- a/src/components/field/BlockerForm.jsx
++++ b/src/components/field/BlockerForm.jsx
+@@ -48,44 +48,60 @@ export default function BlockerForm({ jobId, variant, onClose, onSubmitted }) {
+ 
+   const createBlocker = useMutation({
+     mutationFn: async () => {
+-      const blocker = await base44.entities.Blocker.create({
+-        job_id: jobId,
+-        blocker_type: type,
+-        severity,
+-        note,
+-        photo_evidence_ids: photoIds,
+-        status: 'open',
+-        sync_status: 'pending',
+-      });
+-      return { blocker, blockerType: type, severityLevel: severity, noteText: note };
+-    },
+-    onSuccess: async ({ blocker, blockerType, severityLevel, noteText }) => {
+-      queryClient.invalidateQueries({ queryKey: ['blockers', jobId] });
+-      if (isComms) {
+-        toast.success('Escalation saved for this job.');
+-      } else {
+-        toast.success('Blocker reported');
+-      }
++      const jobCtx = await fetchJobContextForArtifactEvent(jobId);
++      const jobForEvent = { id: jobId, ...jobCtx };
+       try {
+-        const jobCtx = await fetchJobContextForArtifactEvent(jobId);
+         await emitEscalationEvent({
+-          job: { id: jobId, ...jobCtx },
++          job: jobForEvent,
+           user,
+-          reasonCategory: blockerType,
++          reasonCategory: type,
+           escalationSource: 'blocker_create',
+-          severity: severityLevel,
+-          escalationRecordId: blocker?.id != null ? String(blocker.id) : null,
+-          notesPreview: noteText,
++          severity,
++          escalationRecordId: null,
++          notesPreview: note,
++        });
++      } catch (e) {
++        const msg = e instanceof Error ? e.message : String(e);
++        if (import.meta.env.DEV) console.error('[BlockerForm] escalation_event', e);
++        throw new Error(`Telemetry: ${msg}`);
++      }
++      try {
++        const blocker = await base44.entities.Blocker.create({
++          job_id: jobId,
++          blocker_type: type,
++          severity,
++          note,
++          photo_evidence_ids: photoIds,
++          status: 'open',
++          sync_status: 'pending',
+         });
+-      } catch (err) {
++        return { blocker, blockerType: type, severityLevel: severity, noteText: note };
++      } catch (createErr) {
+         if (import.meta.env.DEV) {
+-          console.warn('[escalation] notify path failed after save', err);
++          console.warn('[BlockerForm] Blocker.create failed after escalation_event queued', createErr);
+         }
+-        toast.warning('Notification sync may be delayed.');
++        toast.warning(
++          'Escalation was queued, but saving the record failed. Try again or contact support if it persists.'
++        );
++        throw createErr;
++      }
++    },
++    onSuccess: ({ blocker, blockerType, severityLevel, noteText }) => {
++      queryClient.invalidateQueries({ queryKey: ['blockers', jobId] });
++      if (isComms) {
++        toast.success('Escalation saved for this job.');
++      } else {
++        toast.success('Blocker reported');
+       }
+       onSubmitted?.({ blocker, blockerType, severityLevel, noteText });
+       onClose?.();
+     },
++    onError: (error) => {
++      const msg = error instanceof Error ? error.message : String(error);
++      if (msg.startsWith('Telemetry:')) {
++        toast.error('Could not queue escalation — try again');
++      }
++    },
+   });
+ 
+   return (
+diff --git a/src/components/field/CloseoutPreview.jsx b/src/components/field/CloseoutPreview.jsx
+index faebcf8..5a30bda 100644
+--- a/src/components/field/CloseoutPreview.jsx
++++ b/src/components/field/CloseoutPreview.jsx
+@@ -10,6 +10,7 @@ import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
+ import { emitCloseoutEvent } from '@/lib/closeoutEvent';
+ import { emitFeedbackEvent } from '@/lib/feedbackEvent';
+ import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
++import { deriveCloseoutSubmissionFlags } from '@/lib/closeoutSubmissionFlags';
+ 
+ export default function CloseoutPreview({ job }) {
+   const queryClient = useQueryClient();
+@@ -50,13 +51,20 @@ export default function CloseoutPreview({ job }) {
+ 
+   const allSteps = phases.flatMap(p => p.steps || []);
+   const completedSteps = allSteps.filter(s => s.completed).length;
+-  const runbookComplete = allSteps.length === 0 || completedSteps === allSteps.length;
+ 
+-  const hasSignoff = !!job?.signoff_signer_name && !!job?.signoff_signature_url;
++  const closeoutFlags = deriveCloseoutSubmissionFlags(job, evidence);
++  const {
++    documentationComplete: allEvidenceMet,
++    requiredFieldsComplete: allFieldsMet,
++    runbookComplete,
++    customerSignatureCaptured: hasSignoff,
++  } = closeoutFlags;
+ 
+-  const allEvidenceMet = evidenceChecks.every(c => c.met);
+-  const allFieldsMet = fieldChecks.every(c => c.met);
+-  const canSubmit = allEvidenceMet && allFieldsMet && runbookComplete && hasSignoff;
++  const canSubmit =
++    closeoutFlags.documentationComplete &&
++    closeoutFlags.requiredFieldsComplete &&
++    closeoutFlags.runbookComplete &&
++    closeoutFlags.customerSignatureCaptured;
+ 
+   const hasOptionalFeedback =
+     feedbackRating > 0 || complaintFlag || complimentFlag || feedbackNotes.trim().length > 0;
+@@ -70,10 +78,10 @@ export default function CloseoutPreview({ job }) {
+       await emitCloseoutEvent({
+         job: jobForEvent,
+         user,
+-        documentationComplete: allEvidenceMet,
+-        customerSignatureCaptured: hasSignoff,
+-        runbookComplete,
+-        requiredFieldsComplete: allFieldsMet,
++        documentationComplete: closeoutFlags.documentationComplete,
++        customerSignatureCaptured: closeoutFlags.customerSignatureCaptured,
++        runbookComplete: closeoutFlags.runbookComplete,
++        requiredFieldsComplete: closeoutFlags.requiredFieldsComplete,
+         closeoutSubmitTimestampIso: submitTs,
+         timecardSubmittedFlag: timecardSubmitted ? true : null,
+         invoiceSupportDocsFlag: invoiceSupportDocs ? true : null,
+diff --git a/src/components/fieldv2/JobStateTransitioner.jsx b/src/components/fieldv2/JobStateTransitioner.jsx
+index 6cd342c..79bbf64 100644
+--- a/src/components/fieldv2/JobStateTransitioner.jsx
++++ b/src/components/fieldv2/JobStateTransitioner.jsx
+@@ -5,7 +5,6 @@
+ 
+ import React, { useState, useRef } from 'react';
+ import { useMutation, useQueryClient } from '@tanstack/react-query';
+-import { base44 } from '@/api/base44Client';
+ import { useAuth } from '@/lib/AuthContext';
+ import {
+   canTransition,
+@@ -18,11 +17,16 @@ import {
+ } from 'lucide-react';
+ import { cn } from '@/lib/utils';
+ import { toast } from 'sonner';
+-import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
++import { executeJobStateTransitionMutation } from '@/lib/jobStateTransitionMutation';
+ import PreJobToolCheckModal from './PreJobToolCheckModal';
+ import { EtaAcknowledgementSheet } from '@/components/field/AcknowledgementSheets.jsx';
+ import { BTN_SECONDARY, FIELD_CARD, FIELD_CTRL_H, FIELD_META } from '@/lib/fieldVisualTokens';
+ 
++const READINESS_HINT_EN_ROUTE =
++  'You will confirm travel / ETA details before the job moves to en route.';
++const READINESS_HINT_START_WORK =
++  'A short pre-start checklist runs before the job moves to in progress.';
++
+ function RequirementItem({ requirement, blocker }) {
+   const status = blocker?.isMet ? 'met' : 'unmet';
+   return (
+@@ -62,49 +66,23 @@ export default function JobStateTransitioner({
+   const pendingEnRouteRef = useRef(null);
+   const qc = useQueryClient();
+ 
++  /*
++   * TECHNICAL_DEBT (target Iteration 4/5): Field v2 canonical path uses jobRepository / apiClient
++   * elsewhere; long-term, job status updates should go through the same abstraction instead of
++   * direct base44.entities.Job.update. Intentionally unchanged scope for Iteration 3 (executeJobStateTransitionMutation).
++   */
+   const transitionMutation = useMutation({
+-    mutationFn: async ({ toStatus, isOverride, dispatchOverrides, priorStatus }) => {
+-      if (!job?.id || !user) {
+-        throw new Error('Missing job or user');
+-      }
+-      const fromStatus = priorStatus ?? job.status;
+-      try {
+-        await emitDispatchEventForJobStatusChange({
+-          job,
+-          targetAppStatus: toStatus,
+-          user,
+-          overrides:
+-            dispatchOverrides && typeof dispatchOverrides === 'object' ? dispatchOverrides : {},
+-        });
+-      } catch (e) {
+-        const msg = e instanceof Error ? e.message : String(e);
+-        if (import.meta.env.DEV) console.error('[JobStateTransitioner] dispatch_event', e);
+-        throw new Error(`Telemetry: ${msg}`);
+-      }
+-      const now = new Date().toISOString();
+-      const timeFields = {};
+-      if (toStatus === 'checked_in') {
+-        timeFields.check_in_time = now;
+-      }
+-      if (toStatus === 'in_progress' && fromStatus !== 'paused') {
+-        timeFields.work_start_time = now;
+-        timeFields.check_in_time = job.check_in_time || now;
+-      }
+-      if (toStatus === 'pending_closeout') {
+-        timeFields.work_end_time = now;
+-      }
+-      const payload = {
+-        status: toStatus,
+-        ...timeFields,
+-        ...(isOverride && { override_reason: overrideReason, overridden_by: user.email }),
+-      };
+-      /*
+-       * TECHNICAL_DEBT (target Iteration 4/5): Field v2 canonical path uses jobRepository / apiClient
+-       * elsewhere; long-term, job status updates should go through the same abstraction instead of
+-       * direct base44.entities.Job.update. Intentionally unchanged scope for Iteration 3.
+-       */
+-      return base44.entities.Job.update(job.id, payload);
+-    },
++    mutationFn: ({ toStatus, isOverride, dispatchOverrides, priorStatus }) =>
++      executeJobStateTransitionMutation({
++        job,
++        user,
++        evidence,
++        toStatus,
++        fromStatus: priorStatus ?? job.status,
++        isOverride,
++        overrideReason,
++        dispatchOverrides,
++      }),
+     onSuccess: (data) => {
+       if (!job?.id) return;
+       qc.invalidateQueries({ queryKey: ['fj-job', job.id] });
+@@ -242,7 +220,28 @@ export default function JobStateTransitioner({
+                         → {targetLabel.label}
+                       </span>
+                     </div>
+-                    <p className="text-xs text-slate-600 mb-2">{description}</p>
++                    <p
++                      className={cn(
++                        'text-xs text-slate-600',
++                        to === 'en_route' || (to === 'in_progress' && currentStatus !== 'paused')
++                          ? 'mb-1'
++                          : 'mb-2'
++                      )}
++                    >
++                      {description}
++                    </p>
++                    {to === 'en_route' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_EN_ROUTE}</p>
++                    ) : null}
++                    {to === 'in_progress' && currentStatus !== 'paused' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>{READINESS_HINT_START_WORK}</p>
++                    ) : null}
++                    {to === 'pending_closeout' ? (
++                      <p className={cn(FIELD_META, 'mb-2 leading-snug')}>
++                        Open the <strong className="font-semibold text-slate-700">Closeout</strong> tab first — it
++                        lists what is still missing before you should mark work complete.
++                      </p>
++                    ) : null}
+ 
+                     {/* Blockers */}
+                     {gate.blockers.length > 0 && (
+diff --git a/src/lib/canonicalFieldEventCoverage.ts b/src/lib/canonicalFieldEventCoverage.ts
+new file mode 100644
+index 0000000..48c7145
+--- /dev/null
++++ b/src/lib/canonicalFieldEventCoverage.ts
+@@ -0,0 +1,104 @@
++/**
++ * Iteration 14 — audit map: canonical event families vs field-v2 surfaces.
++ * Documentation-only registry; tests ensure all required families stay listed.
++ * Do not use for runtime routing — see individual emitters under src/lib/*Event.js and jobContextField.js.
++ */
++
++export const ITERATION_14_REQUIRED_FAMILIES = [
++  'dispatch',
++  'travel',
++  'arrival',
++  'runbook_step',
++  'artifact',
++  'qc',
++  'closeout',
++  'escalation',
++  'feedback',
++  'tool_check',
++  'job_context',
++] as const
++
++export type Iteration14EventFamily = (typeof ITERATION_14_REQUIRED_FAMILIES)[number]
++
++export type FamilyCoverageRow = {
++  /** Primary implementation module (path from repo root). */
++  emitterModule: string
++  /** Exported emit/build entrypoints. */
++  emitExports: string[]
++  /** Canonical FieldJobDetail / fieldv2 touchpoints. */
++  v2Surfaces: string[]
++  notes: string
++}
++
++/**
++ * One row per Iteration-14 family. Travel and arrival share travelArrivalEvent.js by design.
++ */
++export const CANONICAL_FIELD_EVENT_COVERAGE: Record<Iteration14EventFamily, FamilyCoverageRow> = {
++  dispatch: {
++    emitterModule: 'src/lib/dispatchEvent.js',
++    emitExports: ['emitDispatchEventForJobStatusChange'],
++    v2Surfaces: ['JobStateTransitioner', 'useJobQueue (FieldJobs timer)'],
++    notes: 'emit-before-Job.update in JobStateTransitioner; closeout submit path chains after closeout_event',
++  },
++  travel: {
++    emitterModule: 'src/lib/travelArrivalEvent.js',
++    emitExports: ['buildTravelEventPayload', 'emitCanonicalEventsForTimeEntry'],
++    v2Surfaces: ['FieldTimeTracker: no travel_start; TimeLog/TimerPanel legacy'],
++    notes: 'FieldJobDetail overview lacks travel_start/travel_end — product follow-up; work_start emits arrival only',
++  },
++  arrival: {
++    emitterModule: 'src/lib/travelArrivalEvent.js',
++    emitExports: ['buildArrivalEventPayload', 'emitCanonicalEventsForTimeEntry'],
++    v2Surfaces: ['FieldTimeTracker (work_start before time entry)'],
++    notes: 'Arrival/work_start queued before apiClient.createTimeEntry',
++  },
++  runbook_step: {
++    emitterModule: 'src/lib/runbookStepEvent.js',
++    emitExports: ['emitRunbookStepEvent'],
++    v2Surfaces: ['RunbookSteps'],
++    notes: 'emit before persistOutcome (Job.update) on complete/fail; start emits before local session only',
++  },
++  artifact: {
++    emitterModule: 'src/lib/artifactEvent.js',
++    emitExports: ['emitArtifactEventForCompletedUpload'],
++    v2Surfaces: ['fieldAdapters Base44UploadAdapter.completeUpload', 'EvidenceCaptureModal'],
++    notes: 'After Evidence.create by design — payload needs persisted evidence id',
++  },
++  qc: {
++    emitterModule: 'src/lib/qcEvent.js',
++    emitExports: ['emitQcEvent'],
++    v2Surfaces: ['fieldAdapters Base44LabelAdapter.createLabel', 'EvidenceGalleryView labeling'],
++    notes: 'After LabelRecord.create — schema needs record linkage',
++  },
++  closeout: {
++    emitterModule: 'src/lib/closeoutEvent.js',
++    emitExports: ['emitCloseoutEvent'],
++    v2Surfaces: ['JobStateTransitioner (pending_closeout→submitted)', 'CloseoutPreview legacy'],
++    notes:
++      'Flags: closeoutSubmissionFlags.ts deriveCloseoutSubmissionFlags; closeout_event before dispatch_event before Job.update on v2 submit (Iteration 14)',
++  },
++  escalation: {
++    emitterModule: 'src/lib/escalationEvent.js',
++    emitExports: ['emitEscalationEvent'],
++    v2Surfaces: ['BlockerForm (JobCommsSection)', 'PMChatView', 'TasksTab'],
++    notes: 'Iteration 14: emit before Blocker.create; escalation_record_id optional until row exists',
++  },
++  feedback: {
++    emitterModule: 'src/lib/feedbackEvent.js',
++    emitExports: ['emitFeedbackEvent'],
++    v2Surfaces: ['JobCloseoutOutcomePanel', 'CloseoutPreview optional block'],
++    notes: 'Iteration 14: emit before Job.update for technician outcome panel',
++  },
++  tool_check: {
++    emitterModule: 'src/lib/toolCheckEvent.js',
++    emitExports: ['emitToolCheckEvent'],
++    v2Surfaces: ['PreJobToolCheckModal'],
++    notes: 'Emit before parent transition continues',
++  },
++  job_context: {
++    emitterModule: 'src/lib/jobContextField.js',
++    emitExports: ['emitJobContextFieldIfChanged'],
++    v2Surfaces: ['FieldJobDetail useEffect'],
++    notes: 'Fingerprint dedupe; not tied to single entity mutation',
++  },
++}
+diff --git a/src/lib/__tests__/canonicalFieldEventCoverage.test.ts b/src/lib/__tests__/canonicalFieldEventCoverage.test.ts
+new file mode 100644
+index 0000000..858f4db
+--- /dev/null
++++ b/src/lib/__tests__/canonicalFieldEventCoverage.test.ts
+@@ -0,0 +1,37 @@
++import { describe, it, expect } from 'vitest';
++import { readFileSync, existsSync } from 'fs';
++import { fileURLToPath } from 'url';
++import { dirname, join } from 'path';
++import {
++  CANONICAL_FIELD_EVENT_COVERAGE,
++  ITERATION_14_REQUIRED_FAMILIES,
++} from '@/lib/canonicalFieldEventCoverage';
++
++const __dirname = dirname(fileURLToPath(import.meta.url));
++const repoRoot = join(__dirname, '..', '..', '..');
++
++describe('canonicalFieldEventCoverage', () => {
++  it('lists every Iteration 14 required family exactly once', () => {
++    const keys = Object.keys(CANONICAL_FIELD_EVENT_COVERAGE).sort();
++    const required = [...ITERATION_14_REQUIRED_FAMILIES].sort();
++    expect(keys).toEqual(required);
++  });
++
++  it('each row references an existing emitter module on disk', () => {
++    for (const family of ITERATION_14_REQUIRED_FAMILIES) {
++      const row = CANONICAL_FIELD_EVENT_COVERAGE[family];
++      const abs = join(repoRoot, row.emitterModule);
++      expect(existsSync(abs), `${family}: ${row.emitterModule}`).toBe(true);
++    }
++  });
++
++  it('each emitter module contains listed export names (string match)', () => {
++    for (const family of ITERATION_14_REQUIRED_FAMILIES) {
++      const row = CANONICAL_FIELD_EVENT_COVERAGE[family];
++      const src = readFileSync(join(repoRoot, row.emitterModule), 'utf8');
++      for (const ex of row.emitExports) {
++        expect(src.includes(ex), `${family}: missing "${ex}" in ${row.emitterModule}`).toBe(true);
++      }
++    }
++  });
++});
+diff --git a/src/lib/closeoutSubmissionFlags.ts b/src/lib/closeoutSubmissionFlags.ts
+new file mode 100644
+index 0000000..ec129fb
+--- /dev/null
++++ b/src/lib/closeoutSubmissionFlags.ts
+@@ -0,0 +1,71 @@
++/**
++ * Shared booleans for closeout_event payloads (Iteration 14).
++ * Mirrors legacy CloseoutPreview checks so FieldJobDetail submit and CloseoutPreview stay aligned.
++ */
++
++/** Minimal evidence shape for documentation completeness. */
++export type EvidenceForCloseoutFlags = {
++  evidence_type?: string
++  status?: string
++}
++
++export interface CloseoutSubmissionFlags {
++  documentationComplete: boolean
++  customerSignatureCaptured: boolean
++  runbookComplete: boolean
++  requiredFieldsComplete: boolean
++}
++
++/**
++ * Derive closeout_event boolean flags from job + evidence (uploaded docs only).
++ * - documentation: every evidence_requirements row met by uploaded evidence of matching type
++ * - customer signature: both signer name and signature URL present
++ * - runbook: all steps completed, or no steps
++ * - required fields: every required fields_schema entry has non-empty value
++ */
++export function deriveCloseoutSubmissionFlags(
++  job: Record<string, unknown> | null | undefined,
++  evidence: EvidenceForCloseoutFlags[]
++): CloseoutSubmissionFlags {
++  const requirements = Array.isArray(job?.evidence_requirements)
++    ? (job!.evidence_requirements as Array<{ type?: string; min_count?: number; label?: string }>)
++    : []
++  const fields = Array.isArray(job?.fields_schema)
++    ? (job!.fields_schema as Array<{ required?: boolean; value?: string; label?: string; key?: string }>)
++    : []
++  const phases = Array.isArray(job?.runbook_phases)
++    ? (job!.runbook_phases as Array<{ steps?: Array<{ completed?: boolean }> }>)
++    : []
++
++  const evidenceChecks = requirements.map((req) => {
++    const min = req.min_count ?? 1
++    const matching = evidence.filter(
++      (e) => e.evidence_type === req.type && e.status === 'uploaded'
++    )
++    return matching.length >= min
++  })
++  const documentationComplete =
++    requirements.length === 0 ? true : evidenceChecks.every(Boolean)
++
++  const fieldChecks = fields
++    .filter((f) => f.required)
++    .map((f) => !!f.value && String(f.value).trim() !== '')
++  const requiredFieldsComplete = fieldChecks.length === 0 ? true : fieldChecks.every(Boolean)
++
++  const allSteps = phases.flatMap((p) => p.steps || [])
++  const completedSteps = allSteps.filter((s) => s.completed).length
++  const runbookComplete = allSteps.length === 0 || completedSteps === allSteps.length
++
++  const customerSignatureCaptured =
++    !!job?.signoff_signer_name &&
++    typeof job.signoff_signer_name === 'string' &&
++    !!job?.signoff_signature_url &&
++    typeof job.signoff_signature_url === 'string'
++
++  return {
++    documentationComplete,
++    customerSignatureCaptured,
++    runbookComplete,
++    requiredFieldsComplete,
++  }
++}
+diff --git a/src/lib/__tests__/closeoutSubmissionFlags.test.ts b/src/lib/__tests__/closeoutSubmissionFlags.test.ts
+new file mode 100644
+index 0000000..ba0c9cc
+--- /dev/null
++++ b/src/lib/__tests__/closeoutSubmissionFlags.test.ts
+@@ -0,0 +1,107 @@
++import { describe, it, expect } from 'vitest';
++import { deriveCloseoutSubmissionFlags } from '@/lib/closeoutSubmissionFlags';
++
++describe('deriveCloseoutSubmissionFlags', () => {
++  it('returns all true when job has no requirements, no required fields, no runbook steps, and signoff', () => {
++    const job = {
++      evidence_requirements: [],
++      fields_schema: [],
++      runbook_phases: [],
++      signoff_signer_name: 'A',
++      signoff_signature_url: 'https://x',
++    };
++    const f = deriveCloseoutSubmissionFlags(job, []);
++    expect(f).toEqual({
++      documentationComplete: true,
++      customerSignatureCaptured: true,
++      runbookComplete: true,
++      requiredFieldsComplete: true,
++    });
++  });
++
++  it('documentation false when requirement not met', () => {
++    const job = {
++      evidence_requirements: [{ type: 'photo', min_count: 1 }],
++      fields_schema: [],
++      runbook_phases: [],
++      signoff_signer_name: 'A',
++      signoff_signature_url: 'u',
++    };
++    expect(deriveCloseoutSubmissionFlags(job, []).documentationComplete).toBe(false);
++    expect(
++      deriveCloseoutSubmissionFlags(job, [{ evidence_type: 'photo', status: 'uploaded' }])
++        .documentationComplete
++    ).toBe(true);
++  });
++
++  it('required fields false when required field empty', () => {
++    const job = {
++      evidence_requirements: [],
++      fields_schema: [{ required: true, key: 'k', value: '' }],
++      runbook_phases: [],
++      signoff_signer_name: 'A',
++      signoff_signature_url: 'u',
++    };
++    expect(deriveCloseoutSubmissionFlags(job, []).requiredFieldsComplete).toBe(false);
++    expect(
++      deriveCloseoutSubmissionFlags(
++        {
++          ...job,
++          fields_schema: [{ required: true, key: 'k', value: 'x' }],
++        },
++        []
++      ).requiredFieldsComplete
++    ).toBe(true);
++  });
++
++  it('runbook false when a step incomplete', () => {
++    const job = {
++      evidence_requirements: [],
++      fields_schema: [],
++      runbook_phases: [{ steps: [{ completed: false }] }],
++      signoff_signer_name: 'A',
++      signoff_signature_url: 'u',
++    };
++    expect(deriveCloseoutSubmissionFlags(job, []).runbookComplete).toBe(false);
++    expect(
++      deriveCloseoutSubmissionFlags(
++        {
++          ...job,
++          runbook_phases: [{ steps: [{ completed: true }] }],
++        },
++        []
++      ).runbookComplete
++    ).toBe(true);
++  });
++
++  it('customerSignatureCaptured false without both name and url', () => {
++    const base = {
++      evidence_requirements: [],
++      fields_schema: [],
++      runbook_phases: [],
++    };
++    expect(deriveCloseoutSubmissionFlags({ ...base, signoff_signer_name: 'A' }, []).customerSignatureCaptured).toBe(
++      false
++    );
++    expect(
++      deriveCloseoutSubmissionFlags(
++        { ...base, signoff_signer_name: 'A', signoff_signature_url: 'u' },
++        []
++      ).customerSignatureCaptured
++    ).toBe(true);
++  });
++
++  it('updated_date on job does not affect flags', () => {
++    const job = {
++      evidence_requirements: [],
++      fields_schema: [],
++      runbook_phases: [],
++      signoff_signer_name: 'A',
++      signoff_signature_url: 'u',
++      updated_date: '2099-01-01',
++    };
++    const a = deriveCloseoutSubmissionFlags(job, []);
++    const b = deriveCloseoutSubmissionFlags({ ...job, updated_date: '2099-01-02' }, []);
++    expect(a).toEqual(b);
++  });
++});
+diff --git a/src/lib/jobStateTransitionMutation.ts b/src/lib/jobStateTransitionMutation.ts
+new file mode 100644
+index 0000000..6640f41
+--- /dev/null
++++ b/src/lib/jobStateTransitionMutation.ts
+@@ -0,0 +1,109 @@
++/// <reference types="vite/client" />
++
++/**
++ * Job lifecycle transition: canonical telemetry ordering + Job.update payload (Iteration 14).
++ * Closeout submit (pending_closeout → submitted): closeout_event → dispatch_event → persist.
++ */
++
++import { base44 } from '@/api/base44Client';
++import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
++import { emitCloseoutEvent } from '@/lib/closeoutEvent';
++import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
++import { deriveCloseoutSubmissionFlags } from '@/lib/closeoutSubmissionFlags';
++
++type TransitionJob = Record<string, unknown> & { id: string | number };
++type TransitionUser = Record<string, unknown> & { email?: string };
++
++export async function executeJobStateTransitionMutation({
++  job,
++  user,
++  evidence = [],
++  toStatus,
++  fromStatus,
++  isOverride,
++  overrideReason,
++  dispatchOverrides,
++}: {
++  job: TransitionJob;
++  user: TransitionUser;
++  evidence?: Array<Record<string, unknown>>;
++  toStatus: string;
++  fromStatus: string;
++  isOverride: boolean;
++  overrideReason: string;
++  dispatchOverrides: Record<string, unknown> | undefined;
++}) {
++  if (job?.id == null || !user) {
++    throw new Error('Missing job or user');
++  }
++
++  const jobId = String(job.id);
++  const closeoutSubmitIso =
++    toStatus === 'submitted' && fromStatus === 'pending_closeout'
++      ? new Date().toISOString()
++      : null;
++
++  if (closeoutSubmitIso) {
++    try {
++      const jobCtx = await fetchJobContextForArtifactEvent(jobId);
++      const jobForEvent = { ...job, ...jobCtx };
++      const flags = deriveCloseoutSubmissionFlags(job, evidence);
++      await emitCloseoutEvent({
++        job: jobForEvent,
++        user,
++        ...flags,
++        closeoutSubmitTimestampIso: closeoutSubmitIso,
++        invoiceSupportDocsFlag: null,
++        portalUpdateFlag: null,
++        timecardSubmittedFlag: null,
++      });
++    } catch (e) {
++      const msg = e instanceof Error ? e.message : String(e);
++      if (import.meta.env.DEV) console.error('[JobStateTransitioner] closeout_event', e);
++      throw new Error(`Telemetry: ${msg}`);
++    }
++  }
++
++  try {
++    await emitDispatchEventForJobStatusChange({
++      job,
++      targetAppStatus: toStatus,
++      user,
++      overrides:
++        dispatchOverrides && typeof dispatchOverrides === 'object' ? dispatchOverrides : {},
++    });
++  } catch (e) {
++    const msg = e instanceof Error ? e.message : String(e);
++    if (import.meta.env.DEV) console.error('[JobStateTransitioner] dispatch_event', e);
++    throw new Error(`Telemetry: ${msg}`);
++  }
++
++  const now = new Date().toISOString();
++  const timeFields: Record<string, string> = {};
++  if (toStatus === 'checked_in') {
++    timeFields.check_in_time = now;
++  }
++  if (toStatus === 'in_progress' && fromStatus !== 'paused') {
++    timeFields.work_start_time = now;
++    const checkIn = job.check_in_time;
++    timeFields.check_in_time =
++      typeof checkIn === 'string' && checkIn ? checkIn : now;
++  }
++  if (toStatus === 'pending_closeout') {
++    timeFields.work_end_time = now;
++  }
++  if (closeoutSubmitIso) {
++    timeFields.closeout_submitted_at = closeoutSubmitIso;
++  }
++
++  const payload: Record<string, unknown> = {
++    status: toStatus,
++    ...timeFields,
++    ...(isOverride && {
++      override_reason: overrideReason,
++      overridden_by: user.email,
++    }),
++  };
++
++  return base44.entities.Job.update(jobId, payload);
++}
+diff --git a/src/lib/__tests__/jobStateTransitionMutation.test.ts b/src/lib/__tests__/jobStateTransitionMutation.test.ts
+new file mode 100644
+index 0000000..7818a37
+--- /dev/null
++++ b/src/lib/__tests__/jobStateTransitionMutation.test.ts
+@@ -0,0 +1,122 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++
++const hoisted = vi.hoisted(() => ({
++  emitCloseoutEvent: vi.fn().mockResolvedValue(undefined),
++  emitDispatchEventForJobStatusChange: vi.fn().mockResolvedValue(undefined),
++  fetchJobContextForArtifactEvent: vi.fn().mockResolvedValue({ project_id: 'p99' }),
++  jobUpdate: vi.fn().mockResolvedValue({ id: 'j1', status: 'submitted' }),
++}));
++
++vi.mock('@/api/base44Client', () => ({
++  base44: {
++    entities: {
++      Job: {
++        update: (...args: unknown[]) => hoisted.jobUpdate(...args),
++      },
++    },
++  },
++}));
++
++vi.mock('@/lib/artifactEvent', () => ({
++  fetchJobContextForArtifactEvent: hoisted.fetchJobContextForArtifactEvent,
++}));
++
++vi.mock('@/lib/closeoutEvent', () => ({
++  emitCloseoutEvent: hoisted.emitCloseoutEvent,
++}));
++
++vi.mock('@/lib/dispatchEvent', () => ({
++  emitDispatchEventForJobStatusChange: hoisted.emitDispatchEventForJobStatusChange,
++}));
++
++import { executeJobStateTransitionMutation } from '@/lib/jobStateTransitionMutation';
++
++const baseJob = {
++  id: 'j1',
++  status: 'pending_closeout',
++  evidence_requirements: [],
++  fields_schema: [],
++  runbook_phases: [],
++  signoff_signer_name: 'A',
++  signoff_signature_url: 'https://sig',
++};
++
++const user = { email: 't@x.com', id: 'u1' };
++
++describe('executeJobStateTransitionMutation', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    hoisted.emitCloseoutEvent.mockResolvedValue(undefined);
++    hoisted.emitDispatchEventForJobStatusChange.mockResolvedValue(undefined);
++    hoisted.fetchJobContextForArtifactEvent.mockResolvedValue({ project_id: 'p99' });
++    hoisted.jobUpdate.mockResolvedValue({ id: 'j1', status: 'submitted' });
++  });
++
++  it('emits closeout_event before dispatch_event before Job.update when submitting from pending_closeout', async () => {
++    const order: string[] = [];
++    hoisted.emitCloseoutEvent.mockImplementation(async () => {
++      order.push('closeout');
++    });
++    hoisted.emitDispatchEventForJobStatusChange.mockImplementation(async () => {
++      order.push('dispatch');
++    });
++    hoisted.jobUpdate.mockImplementation(async () => {
++      order.push('update');
++      return {};
++    });
++
++    await executeJobStateTransitionMutation({
++      job: baseJob,
++      user,
++      evidence: [],
++      toStatus: 'submitted',
++      fromStatus: 'pending_closeout',
++      isOverride: false,
++      overrideReason: '',
++      dispatchOverrides: undefined,
++    });
++
++    expect(order).toEqual(['closeout', 'dispatch', 'update']);
++    expect(hoisted.emitCloseoutEvent).toHaveBeenCalledTimes(1);
++    const closeoutArg = hoisted.emitCloseoutEvent.mock.calls[0][0];
++    expect(closeoutArg.job).toMatchObject({ id: 'j1', project_id: 'p99' });
++    expect(closeoutArg.closeoutSubmitTimestampIso).toBeDefined();
++    expect(hoisted.jobUpdate).toHaveBeenCalledWith(
++      'j1',
++      expect.objectContaining({
++        status: 'submitted',
++        closeout_submitted_at: closeoutArg.closeoutSubmitTimestampIso,
++      })
++    );
++  });
++
++  it('does not emit closeout_event for other transitions', async () => {
++    await executeJobStateTransitionMutation({
++      job: { ...baseJob, status: 'checked_in' },
++      user,
++      evidence: [],
++      toStatus: 'in_progress',
++      fromStatus: 'checked_in',
++      isOverride: false,
++      overrideReason: '',
++      dispatchOverrides: undefined,
++    });
++    expect(hoisted.emitCloseoutEvent).not.toHaveBeenCalled();
++    expect(hoisted.emitDispatchEventForJobStatusChange).toHaveBeenCalled();
++    expect(hoisted.jobUpdate).toHaveBeenCalled();
++  });
++
++  it('does not emit closeout_event when submitting from non-pending_closeout', async () => {
++    await executeJobStateTransitionMutation({
++      job: { ...baseJob, status: 'submitted' },
++      user,
++      evidence: [],
++      toStatus: 'approved',
++      fromStatus: 'submitted',
++      isOverride: false,
++      overrideReason: '',
++      dispatchOverrides: undefined,
++    });
++    expect(hoisted.emitCloseoutEvent).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/lib/technicianCloseoutOutcomeSave.ts b/src/lib/technicianCloseoutOutcomeSave.ts
+new file mode 100644
+index 0000000..d93a293
+--- /dev/null
++++ b/src/lib/technicianCloseoutOutcomeSave.ts
+@@ -0,0 +1,33 @@
++/**
++ * Technician closeout outcome: feedback_event queued before Job row reflects outcome (Iteration 14).
++ */
++import { base44 } from '@/api/base44Client';
++import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
++import { emitFeedbackEvent } from '@/lib/feedbackEvent';
++import {
++  buildCloseoutFeedbackEventArgs,
++  buildTechnicianCloseoutJobUpdate,
++  type TechnicianCloseoutFeedbackForm,
++} from '@/lib/fieldCloseoutFeedbackViewModel';
++
++export async function saveTechnicianCloseoutOutcomeWithTelemetry(
++  job: Record<string, unknown> & { id: string },
++  user: unknown,
++  form: TechnicianCloseoutFeedbackForm
++): Promise<Record<string, unknown>> {
++  const recordedAtIso = new Date().toISOString();
++  const jobCtx = await fetchJobContextForArtifactEvent(String(job.id));
++  const jobForEvent = { ...job, ...jobCtx };
++  try {
++    await emitFeedbackEvent({
++      ...buildCloseoutFeedbackEventArgs({ job: jobForEvent, user, form }),
++      feedbackTimestampIso: recordedAtIso,
++    });
++  } catch (e) {
++    const msg = e instanceof Error ? e.message : String(e);
++    throw new Error(`Telemetry: ${msg}`);
++  }
++  const patch = buildTechnicianCloseoutJobUpdate(form, { recordedAtIso });
++  await base44.entities.Job.update(job.id, patch);
++  return patch;
++}
+diff --git a/src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts b/src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts
+new file mode 100644
+index 0000000..1ec3812
+--- /dev/null
++++ b/src/lib/__tests__/technicianCloseoutOutcomeSave.test.ts
+@@ -0,0 +1,78 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++
++const hoisted = vi.hoisted(() => ({
++  emitFeedbackEvent: vi.fn().mockResolvedValue(undefined),
++  fetchJobContextForArtifactEvent: vi.fn().mockResolvedValue({ site_id: 's1' }),
++  jobUpdate: vi.fn().mockResolvedValue({}),
++}));
++
++vi.mock('@/api/base44Client', () => ({
++  base44: {
++    entities: {
++      Job: {
++        update: (...args: unknown[]) => hoisted.jobUpdate(...args),
++      },
++    },
++  },
++}));
++
++vi.mock('@/lib/artifactEvent', () => ({
++  fetchJobContextForArtifactEvent: hoisted.fetchJobContextForArtifactEvent,
++}));
++
++vi.mock('@/lib/feedbackEvent', () => ({
++  emitFeedbackEvent: hoisted.emitFeedbackEvent,
++}));
++
++import { saveTechnicianCloseoutOutcomeWithTelemetry } from '@/lib/technicianCloseoutOutcomeSave';
++
++describe('saveTechnicianCloseoutOutcomeWithTelemetry', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    hoisted.emitFeedbackEvent.mockResolvedValue(undefined);
++    hoisted.fetchJobContextForArtifactEvent.mockResolvedValue({ site_id: 's1' });
++    hoisted.jobUpdate.mockResolvedValue({});
++  });
++
++  it('calls emitFeedbackEvent before Job.update with matching feedback and recorded timestamps', async () => {
++    const order: string[] = [];
++    let feedbackTs: string | undefined;
++    let patchTs: string | undefined;
++
++    hoisted.emitFeedbackEvent.mockImplementation(async (opts: { feedbackTimestampIso?: string }) => {
++      order.push('feedback');
++      feedbackTs = opts.feedbackTimestampIso;
++    });
++    hoisted.jobUpdate.mockImplementation(async (_id: string, patch: Record<string, unknown>) => {
++      order.push('update');
++      patchTs = patch.technician_closeout_recorded_at as string;
++      return {};
++    });
++
++    const job = {
++      id: 'job-42',
++      technician_closeout_outcome: null,
++    };
++    const user = { id: 'u1' };
++    const form = {
++      outcome: 'clean' as const,
++      rating: null,
++      complaintFlag: false,
++      complimentFlag: false,
++      notes: '',
++    };
++
++    await saveTechnicianCloseoutOutcomeWithTelemetry(job, user, form);
++
++    expect(order).toEqual(['feedback', 'update']);
++    expect(feedbackTs).toBeDefined();
++    expect(patchTs).toBe(feedbackTs);
++    expect(hoisted.emitFeedbackEvent).toHaveBeenCalledWith(
++      expect.objectContaining({
++        job: expect.objectContaining({ id: 'job-42', site_id: 's1' }),
++        feedbackSource: 'closeout',
++        feedbackTimestampIso: feedbackTs,
++      })
++    );
++  });
++});

@@ -1,0 +1,439 @@
+diff --git a/docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md b/docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
+index 7a64685..980dcec 100644
+--- a/docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
++++ b/docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
+@@ -250,7 +250,7 @@ flowchart LR
+ - **Schemas:** [tool_check_event.json](../../Azure%20Analysis/tool_check_event.json), [job_context_field.json](../../Azure%20Analysis/job_context_field.json) — strict `additionalProperties: false`; shared envelope keys + family-specific required fields.
+ - **Libraries:** [toolCheckEvent.js](../../src/lib/toolCheckEvent.js), [jobContextField.js](../../src/lib/jobContextField.js) → `enqueueCanonicalEvent(..., { allowlistKeys })`.
+ - **Tool check:** [PreJobToolCheckModal.jsx](../../src/components/fieldv2/PreJobToolCheckModal.jsx) — four required acknowledgements (`ppe_compliant_flag`, `essential_tools_ready_flag`, `bom_docs_reviewed_flag`, `site_safety_ack_flag`); `all_items_passed_flag` must equal their logical AND; **`emitToolCheckEvent` before** job moves to `in_progress`; enqueue failure **blocks** (toast). Entry points: [JobOverview.jsx](../../src/components/fieldv2/JobOverview.jsx) **Start Job** (skips modal when resuming from **`paused`**); [JobStateTransitioner.jsx](../../src/components/fieldv2/JobStateTransitioner.jsx) transition to **`in_progress`** except resume from **`paused`** (no repeat checklist).
+-- **Job context:** [FieldJobDetail.jsx](../../src/pages/FieldJobDetail.jsx) — when job loads and the canonical context string (runbook version, status, requirement/step/field counts, `updated_date`, stable technician key) changes, **`emitJobContextFieldIfChanged`** computes **SHA-256** `context_fingerprint`, compares to **`localStorage`** `purpulse_jcf_fp_v1_${jobId}`, and enqueues at most once per fingerprint; failures are **logged only** (does not block the screen).
++- **Job context:** [FieldJobDetail.jsx](../../src/pages/FieldJobDetail.jsx) — when job detail identity changes (fingerprint material: counts, status, runbook version, trimmed **`project_id` / `site_id`**, runbook phase/step structure key, stable technician key; **not** `updated_date`), the outbound event includes **`project_id` / `site_id`** when set (same normalization as fingerprint). **`emitJobContextFieldIfChanged`** computes **SHA-256** `context_fingerprint`, compares to **`localStorage`** `purpulse_jcf_fp_v1_${jobId}`, serializes concurrent attempts per job, and enqueues at most once per fingerprint; failures are **logged only** (does not block the screen). Blockers query on the same page is **carry-through** for closeout/comms, not part of this snapshot seam.
+ 
+ ### 6.10 Coverage-driven acknowledgements (Iteration 11)
+ 
+diff --git a/src/lib/jobContextField.js b/src/lib/jobContextField.js
+index 9d2bc5c..d4f231e 100644
+--- a/src/lib/jobContextField.js
++++ b/src/lib/jobContextField.js
+@@ -1,8 +1,21 @@
+ /**
+- * Canonical job_context_field snapshot → core.fact_job_context_field (Iteration 10).
++ * Canonical job_context_field snapshot → core.fact_job_context_field (Iterations 10 + 12).
+  * Schema: Azure Analysis/job_context_field.json
+  *
+- * Dedupe: same `context_fingerprint` for a job_id is not re-emitted (localStorage).
++ * Dedupe: same `context_fingerprint` per `job_id` is not re-emitted (localStorage).
++ *
++ * Fingerprint material (hashed → context_fingerprint; bump JOB_CONTEXT_SCHEMA_VERSION when this set changes):
++ *   context_schema_version, evidence requirement count, required field count, runbook step count,
++ *   runbook_version, job_status, project_id, site_id, runbook_structure_key (phase/step identity),
++ *   technician key (stable non-PII id).
++ * Omitted on purpose: job.updated_date (noisy; does not reflect meaningful operational context).
++ *
++ * Outbound payload (allowlisted) carries counts, status, runbook_version, optional project_id/site_id, etc.;
++ * runbook_structure_key is fingerprint-only — not a separate Azure field.
++ * project_id / site_id use the same normalization as fingerprint material so downstream rows match dedupe intent.
++ *
++ * When changing fingerprint inputs: bump JOB_CONTEXT_SCHEMA_VERSION, update tests, and refresh planning docs
++ * (e.g. FIELD_APP_TECHPULSE_AZURE_README job-context bullet + build-changes README) together.
+  */
+ 
+ import { uuidv4 } from '@/lib/uuid';
+@@ -15,8 +28,8 @@ import { isTelemetryEnabled } from '@/lib/telemetry';
+ /** @type {string} */
+ export const JOB_CONTEXT_FINGERPRINT_STORAGE_PREFIX = 'purpulse_jcf_fp_v1_';
+ 
+-/** Logical context schema baked into payload (bump when fingerprint inputs change). */
+-export const JOB_CONTEXT_SCHEMA_VERSION = '1.1.0';
++/** Logical context schema baked into payload + fingerprint JSON (bump when fingerprint inputs change). */
++export const JOB_CONTEXT_SCHEMA_VERSION = '1.2.0';
+ 
+ /** @type {string[]} */
+ export const JOB_CONTEXT_FIELD_PROPERTY_KEYS = [
+@@ -86,25 +99,82 @@ function appendDeviceSession(payload) {
+ }
+ 
+ /**
+- * Stable string for hashing — keys sorted conceptually via fixed object literal order.
++ * Trimmed non-empty string for project_id / site_id — shared by fingerprint material and outbound payload.
++ * @param {unknown} v
++ * @returns {string | null} null when absent or whitespace-only
++ */
++export function normalizeJobContextLinkId(v) {
++  if (v == null) return null;
++  const s = String(v).trim();
++  return s === '' ? null : s;
++}
++
++/**
++ * Sorted phase:step tokens so same counts with different runbook identity yield a new fingerprint.
++ * Uses real ids when present; otherwise stable index fallbacks (`__p{i}` / `__s{i}`) per array position —
++ * stable for a given server payload ordering (do not reorder phases/steps here).
++ * @param {unknown[]} phases
++ */
++export function buildRunbookStructureKey(phases) {
++  const tokens = [];
++  const plist = Array.isArray(phases) ? phases : [];
++  plist.forEach((p, pi) => {
++    const pid =
++      p?.id != null && String(p.id).trim() !== '' ? String(p.id) : `__p${pi}`;
++    const steps = Array.isArray(p?.steps) ? p.steps : [];
++    steps.forEach((s, si) => {
++      const sid =
++        s?.id != null && String(s.id).trim() !== '' ? String(s.id) : `__s${si}`;
++      tokens.push(`${pid}:${sid}`);
++    });
++  });
++  tokens.sort();
++  return tokens.join('|');
++}
++
++/**
++ * Plain object of everything that drives context_fingerprint (Iteration 12).
+  * @param {Record<string, unknown>} job
+- * @param {string} [technicianKey] - stable technician id for dedupe (same job + tech + context → one emit)
++ * @param {string} [technicianKey]
++ * @returns {Record<string, string | number>}
+  */
+-export function buildCanonicalJobContextString(job, technicianKey = '') {
+-  const rv = job?.runbook_version != null ? String(job.runbook_version) : '';
+-  const st = job?.status != null ? String(job.status) : '';
+-  const erc = Array.isArray(job?.evidence_requirements) ? job.evidence_requirements.length : 0;
++export function extractJobContextFingerprintMaterial(job, technicianKey = '') {
+   const phases = Array.isArray(job?.runbook_phases) ? job.runbook_phases : [];
+   let rsc = 0;
+   for (const p of phases) {
+     rsc += Array.isArray(p?.steps) ? p.steps.length : 0;
+   }
++  const erc = Array.isArray(job?.evidence_requirements) ? job.evidence_requirements.length : 0;
+   const rfc = Array.isArray(job?.fields_schema)
+     ? job.fields_schema.filter((f) => f && f.required).length
+     : 0;
+-  const ud = job?.updated_date != null ? String(job.updated_date) : '';
++  const rv = job?.runbook_version != null ? String(job.runbook_version) : '';
++  const st = job?.status != null ? String(job.status) : '';
+   const tk = technicianKey != null ? String(technicianKey) : '';
+-  return JSON.stringify({ context_schema_version: JOB_CONTEXT_SCHEMA_VERSION, erc, rfc, rsc, rv, st, ud, tk });
++  const projectId = normalizeJobContextLinkId(job?.project_id) ?? '';
++  const siteId = normalizeJobContextLinkId(job?.site_id) ?? '';
++  const rb_sig = buildRunbookStructureKey(phases);
++  return {
++    context_schema_version: JOB_CONTEXT_SCHEMA_VERSION,
++    erc,
++    rfc,
++    rsc,
++    rv,
++    st,
++    project_id: projectId,
++    site_id: siteId,
++    rb_sig,
++    tk,
++  };
++}
++
++/**
++ * Stable string for hashing — fixed key order via extractJobContextFingerprintMaterial.
++ * @param {Record<string, unknown>} job
++ * @param {string} [technicianKey] - stable technician id for dedupe (same job + tech + context → one emit)
++ */
++export function buildCanonicalJobContextString(job, technicianKey = '') {
++  return JSON.stringify(extractJobContextFingerprintMaterial(job, technicianKey));
+ }
+ 
+ /**
+@@ -248,11 +318,13 @@ export function buildJobContextFieldPayload({
+     payload.runbook_version = runbookVersion;
+   }
+ 
+-  if (job?.project_id != null && job.project_id !== '') {
+-    payload.project_id = String(job.project_id);
++  const outboundProjectId = normalizeJobContextLinkId(job?.project_id);
++  if (outboundProjectId != null) {
++    payload.project_id = outboundProjectId;
+   }
+-  if (job?.site_id != null && job.site_id !== '') {
+-    payload.site_id = String(job.site_id);
++  const outboundSiteId = normalizeJobContextLinkId(job?.site_id);
++  if (outboundSiteId != null) {
++    payload.site_id = outboundSiteId;
+   }
+ 
+   appendDeviceSession(payload);
+@@ -265,6 +337,9 @@ export async function emitJobContextField(opts) {
+   return enqueueCanonicalEvent(built, { allowlistKeys: JOB_CONTEXT_FIELD_PROPERTY_KEYS });
+ }
+ 
++/** Serialize snapshot attempts per job (StrictMode double-mount / overlapping async). */
++const emitJobContextFieldChainById = new Map();
++
+ /**
+  * If fingerprint changed since last emit for this job, build + enqueue and mark storage.
+  * @param {Object} o
+@@ -275,13 +350,26 @@ export async function emitJobContextFieldIfChanged({ job, user = null }) {
+   const jobId = job?.id != null ? String(job.id) : '';
+   if (!jobId) return { emitted: false, reason: 'no_job_id' };
+ 
+-  const technicianKey = getTechnicianIdForCanonicalEvents(user);
+-  const fingerprint = await computeJobContextFingerprint(job, technicianKey);
+-  if (!shouldEmitJobContextSnapshot(jobId, fingerprint)) {
+-    return { emitted: false, reason: 'duplicate_fingerprint', fingerprint };
+-  }
++  const prev = emitJobContextFieldChainById.get(jobId) ?? Promise.resolve();
+ 
+-  await emitJobContextField({ job, user, contextFingerprint: fingerprint });
+-  markJobContextSnapshotEmitted(jobId, fingerprint);
+-  return { emitted: true, fingerprint };
++  const run = async () => {
++    const technicianKey = getTechnicianIdForCanonicalEvents(user);
++    const fingerprint = await computeJobContextFingerprint(job, technicianKey);
++    if (!shouldEmitJobContextSnapshot(jobId, fingerprint)) {
++      return { emitted: false, reason: 'duplicate_fingerprint', fingerprint };
++    }
++    await emitJobContextField({ job, user, contextFingerprint: fingerprint });
++    markJobContextSnapshotEmitted(jobId, fingerprint);
++    return { emitted: true, fingerprint };
++  };
++
++  const current = prev.then(run, run);
++  emitJobContextFieldChainById.set(jobId, current);
++  try {
++    return await current;
++  } finally {
++    if (emitJobContextFieldChainById.get(jobId) === current) {
++      emitJobContextFieldChainById.delete(jobId);
++    }
++  }
+ }
+diff --git a/src/pages/FieldJobDetail.jsx b/src/pages/FieldJobDetail.jsx
+index c57043f..9af5bb9 100644
+--- a/src/pages/FieldJobDetail.jsx
++++ b/src/pages/FieldJobDetail.jsx
+@@ -2,12 +2,13 @@
+  * FieldJobDetail — Single workflow surface: Overview | Runbook | Evidence | Closeout | Comms.
+  * Legacy ?tab= values: timelog→overview, meetings→comms, audit→closeout.
+  */
+-import React, { useState, useMemo, useEffect } from 'react';
++import React, { useState, useMemo, useEffect, useRef } from 'react';
+ import { Link, useSearchParams } from 'react-router-dom';
+ import { useQuery, useQueryClient } from '@tanstack/react-query';
+ import { ArrowLeft, Loader2 } from 'lucide-react';
+ import { cn } from '@/lib/utils';
+ import { apiClient } from '@/api/client';
++import { base44 } from '@/api/base44Client';
+ import { jobRepository } from '@/lib/repositories/jobRepository';
+ import { useAuth } from '@/lib/AuthContext';
+ import {
+@@ -21,6 +22,7 @@ import {
+   deriveTimerSessionFromTimeEntries,
+   formatWorkedDuration,
+ } from '@/lib/fieldJobExecutionModel';
++import { isRunbookComplete } from '@/lib/runbookExecutionViewModel';
+ import {
+   FIELD_MAX_WIDTH,
+   FIELD_META,
+@@ -124,12 +126,19 @@ export default function FieldJobDetail() {
+   const techKey = getTechnicianIdForCanonicalEvents(user);
+   const contextDedupeKey = job ? buildCanonicalJobContextString(job, techKey) : '';
+ 
+-  React.useEffect(() => {
+-    if (!job?.id) return;
++  const jobRef = useRef(job);
++  const userRef = useRef(user);
++  jobRef.current = job;
++  userRef.current = user;
++
++  useEffect(() => {
++    if (!jobId || !contextDedupeKey) return;
++    const j = jobRef.current;
++    if (!j?.id || String(j.id) !== jobId) return;
+     let cancelled = false;
+     (async () => {
+       try {
+-        const result = await emitJobContextFieldIfChanged({ job, user });
++        const result = await emitJobContextFieldIfChanged({ job: j, user: userRef.current });
+         if (import.meta.env.DEV && result.emitted) {
+           console.debug('[job_context_field] emitted', result.fingerprint?.slice(0, 16));
+         }
+@@ -140,7 +149,7 @@ export default function FieldJobDetail() {
+     return () => {
+       cancelled = true;
+     };
+-  }, [job, contextDedupeKey, techKey, user]);
++  }, [jobId, contextDedupeKey, techKey]);
+ 
+   const { data: evidence = [] } = useQuery({
+     queryKey: ['fj-evidence', jobId],
+@@ -172,6 +181,22 @@ export default function FieldJobDetail() {
+     enabled: false,
+   });
+ 
++  /*
++   * Carry-through (NOT Iteration 12 job_context_field scope): blockers query + passing `blockers` into
++   * JobCloseoutSection exist for closeout readiness / comms (Iteration 5+). Iteration 12 only changed
++   * job-context snapshot timing above (refs + contextDedupeKey). This query should eventually move to
++   * jobRepository / apiClient — see technical debt below.
++   *
++   * TECHNICAL_DEBT: Escalation/blocker list uses base44.entities.Blocker.filter directly.
++   * Keep queryKey ['blockers', jobId] aligned with BlockerForm invalidation.
++   */
++  const { data: blockers = [] } = useQuery({
++    queryKey: ['blockers', jobId],
++    queryFn: () => (jobId ? base44.entities.Blocker.filter({ job_id: jobId }) : Promise.resolve([])),
++    enabled: !!jobId,
++    staleTime: 15_000,
++  });
++
+   const invalidateAll = () => {
+     [
+       'fj-job',
+@@ -182,6 +207,7 @@ export default function FieldJobDetail() {
+       'fj-audit',
+       'fj-time-entries',
+     ].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
++    qc.invalidateQueries({ queryKey: ['blockers', jobId] });
+   };
+ 
+   if (!jobId) {
+@@ -225,6 +251,8 @@ export default function FieldJobDetail() {
+     );
+   }
+ 
++  const runbookComplete = isRunbookComplete(job.runbook_phases);
++
+   const tabProps = {
+     job,
+     evidence,
+@@ -233,11 +261,11 @@ export default function FieldJobDetail() {
+     activities,
+     auditLogs,
+     onRefresh: invalidateAll,
++    runbookComplete,
++    onNavigateToSection: setSection,
+   };
+ 
+   const nextStep = getNextStepMessage(job, evidence);
+-  const runbookComplete =
+-    job.runbook_phases?.every((phase) => phase.steps?.every((step) => step.completed)) ?? false;
+   const hasSignature = !!job.signoff_signature_url;
+ 
+   const headerWorked = formatWorkedDuration(executionView.timer.workedSeconds);
+@@ -328,15 +356,22 @@ export default function FieldJobDetail() {
+               {...tabProps}
+               timeEntries={timeEntries}
+               executionView={executionView}
+-              onNavigateToSection={setSection}
+-              runbookComplete={runbookComplete}
+               hasSignature={hasSignature}
+             />
+           )}
+           {section === 'runbook' && <RunbookSteps {...tabProps} />}
+           {section === 'evidence' && <EvidenceGalleryView {...tabProps} />}
+           {section === 'closeout' && (
+-            <JobCloseoutSection job={job} auditLogs={auditLogs} onRefresh={invalidateAll} />
++            <JobCloseoutSection
++              job={job}
++              evidence={evidence}
++              runbookComplete={runbookComplete}
++              timeEntries={timeEntries}
++              blockers={blockers}
++              auditLogs={auditLogs}
++              onRefresh={invalidateAll}
++              onNavigateToSection={setSection}
++            />
+           )}
+           {section === 'comms' && <JobCommsSection {...tabProps} />}
+         </div>
+diff --git a/build-changes/README.md b/build-changes/README.md
+index 6bc9939..bf6541f 100644
+--- a/tmp/readme_before_iter121.md
++++ b/build-changes/README.md
+@@ -755,6 +755,34 @@ git apply --check build-changes/iteration-12-job-context-rigor.patch
+ git apply build-changes/iteration-12-job-context-rigor.patch
+ ```
+ 
++### Iteration 12.1 — Job context polish (after 12)
++
++Documents **blockers query / closeout props** on FieldJobDetail as **carry-through**, not Iteration 12 `job_context_field` scope. **`normalizeJobContextLinkId`** shared by fingerprint material and **`buildJobContextFieldPayload`** so **`project_id` / `site_id`** match dedupe and outbound **`job_context_field`** (Azure schema). Module note: when fingerprint inputs change, bump **`JOB_CONTEXT_SCHEMA_VERSION`**, tests, and planning docs together. **`buildRunbookStructureKey`** comment clarifies index fallback stability.
++
++**Modified:** `src/lib/jobContextField.js`, `src/pages/FieldJobDetail.jsx`, `src/lib/__tests__/fieldJobContextSnapshot.test.ts`, `docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md`, `build-changes/README.md`.
++
++**Patch:** [`iteration-12.1-job-context-polish.patch`](./iteration-12.1-job-context-polish.patch) — apply after Iteration 12.
++
++Re-generate from repo root:
++
++```bash
++{
++  git diff HEAD -- \
++    src/lib/jobContextField.js \
++    src/pages/FieldJobDetail.jsx \
++    src/lib/__tests__/fieldJobContextSnapshot.test.ts \
++    docs/planning/FIELD_APP_TECHPULSE_AZURE_README.md
++  # plus README hunk for this subsection only (see Iteration 11 README regen pattern)
++} > build-changes/iteration-12.1-job-context-polish.patch
++```
++
++```bash
++git apply --check build-changes/iteration-12.1-job-context-polish.patch
++git apply build-changes/iteration-12.1-job-context-polish.patch
++```
++
++---
++
+ ## Adding future iterations
+ 
+ 1. Create `iteration-N-<short-name>.patch` using a scoped `git diff` (and `git diff --no-index` for new files if needed).
+diff --git a/src/lib/__tests__/fieldJobContextSnapshot.test.ts b/src/lib/__tests__/fieldJobContextSnapshot.test.ts
+index 9a5a716..5c90c33 100644
+--- a/tmp/fjcs_before.ts
++++ b/src/lib/__tests__/fieldJobContextSnapshot.test.ts
+@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
+ import {
+   JOB_CONTEXT_SCHEMA_VERSION,
+   buildCanonicalJobContextString,
++  buildJobContextFieldPayload,
+   buildRunbookStructureKey,
+   computeJobContextFingerprint,
+   extractJobContextFingerprintMaterial,
++  normalizeJobContextLinkId,
+ } from '../jobContextField'
+ 
+ const baseJob = {
+@@ -88,4 +90,38 @@ describe('fieldJobContextSnapshot (Iteration 12)', () => {
+     const k = buildRunbookStructureKey(phases as unknown[])
+     expect(k).toBe('a:s1|b:s2')
+   })
++
++  it('normalizeJobContextLinkId trims and rejects empty', () => {
++    expect(normalizeJobContextLinkId('  abc  ')).toBe('abc')
++    expect(normalizeJobContextLinkId('')).toBe(null)
++    expect(normalizeJobContextLinkId('   ')).toBe(null)
++    expect(normalizeJobContextLinkId(null)).toBe(null)
++  })
++
++  it('outbound payload includes project_id and site_id when job has them (schema allowlist)', () => {
++    const p = buildJobContextFieldPayload({
++      job: {
++        id: 'j1',
++        status: 'assigned',
++        project_id: '  proj-x  ',
++        site_id: 'site-y',
++      },
++      user: null,
++      contextFingerprint: 'c'.repeat(64),
++    })
++    expect(p.project_id).toBe('proj-x')
++    expect(p.site_id).toBe('site-y')
++  })
++
++  it('fingerprint material and payload agree on trimmed project_id', () => {
++    const job = { ...baseJob, project_id: '  same  ' }
++    const m = extractJobContextFingerprintMaterial(job, 't')
++    const p = buildJobContextFieldPayload({
++      job,
++      user: null,
++      contextFingerprint: 'd'.repeat(64),
++    })
++    expect(m.project_id).toBe('same')
++    expect(p.project_id).toBe('same')
++  })
+ })

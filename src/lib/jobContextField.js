@@ -1,8 +1,21 @@
 /**
- * Canonical job_context_field snapshot → core.fact_job_context_field (Iteration 10).
+ * Canonical job_context_field snapshot → core.fact_job_context_field (Iterations 10 + 12).
  * Schema: Azure Analysis/job_context_field.json
  *
- * Dedupe: same `context_fingerprint` for a job_id is not re-emitted (localStorage).
+ * Dedupe: same `context_fingerprint` per `job_id` is not re-emitted (localStorage).
+ *
+ * Fingerprint material (hashed → context_fingerprint; bump JOB_CONTEXT_SCHEMA_VERSION when this set changes):
+ *   context_schema_version, evidence requirement count, required field count, runbook step count,
+ *   runbook_version, job_status, project_id, site_id, runbook_structure_key (phase/step identity),
+ *   technician key (stable non-PII id).
+ * Omitted on purpose: job.updated_date (noisy; does not reflect meaningful operational context).
+ *
+ * Outbound payload (allowlisted) carries counts, status, runbook_version, optional project_id/site_id, etc.;
+ * runbook_structure_key is fingerprint-only — not a separate Azure field.
+ * project_id / site_id use the same normalization as fingerprint material so downstream rows match dedupe intent.
+ *
+ * When changing fingerprint inputs: bump JOB_CONTEXT_SCHEMA_VERSION, update tests, and refresh planning docs
+ * (e.g. FIELD_APP_TECHPULSE_AZURE_README job-context bullet + build-changes README) together.
  */
 
 import { uuidv4 } from '@/lib/uuid';
@@ -15,8 +28,8 @@ import { isTelemetryEnabled } from '@/lib/telemetry';
 /** @type {string} */
 export const JOB_CONTEXT_FINGERPRINT_STORAGE_PREFIX = 'purpulse_jcf_fp_v1_';
 
-/** Logical context schema baked into payload (bump when fingerprint inputs change). */
-export const JOB_CONTEXT_SCHEMA_VERSION = '1.1.0';
+/** Logical context schema baked into payload + fingerprint JSON (bump when fingerprint inputs change). */
+export const JOB_CONTEXT_SCHEMA_VERSION = '1.2.0';
 
 /** @type {string[]} */
 export const JOB_CONTEXT_FIELD_PROPERTY_KEYS = [
@@ -86,25 +99,82 @@ function appendDeviceSession(payload) {
 }
 
 /**
- * Stable string for hashing — keys sorted conceptually via fixed object literal order.
- * @param {Record<string, unknown>} job
- * @param {string} [technicianKey] - stable technician id for dedupe (same job + tech + context → one emit)
+ * Trimmed non-empty string for project_id / site_id — shared by fingerprint material and outbound payload.
+ * @param {unknown} v
+ * @returns {string | null} null when absent or whitespace-only
  */
-export function buildCanonicalJobContextString(job, technicianKey = '') {
-  const rv = job?.runbook_version != null ? String(job.runbook_version) : '';
-  const st = job?.status != null ? String(job.status) : '';
-  const erc = Array.isArray(job?.evidence_requirements) ? job.evidence_requirements.length : 0;
+export function normalizeJobContextLinkId(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
+/**
+ * Sorted phase:step tokens so same counts with different runbook identity yield a new fingerprint.
+ * Uses real ids when present; otherwise stable index fallbacks (`__p{i}` / `__s{i}`) per array position —
+ * stable for a given server payload ordering (do not reorder phases/steps here).
+ * @param {unknown[]} phases
+ */
+export function buildRunbookStructureKey(phases) {
+  const tokens = [];
+  const plist = Array.isArray(phases) ? phases : [];
+  plist.forEach((p, pi) => {
+    const pid =
+      p?.id != null && String(p.id).trim() !== '' ? String(p.id) : `__p${pi}`;
+    const steps = Array.isArray(p?.steps) ? p.steps : [];
+    steps.forEach((s, si) => {
+      const sid =
+        s?.id != null && String(s.id).trim() !== '' ? String(s.id) : `__s${si}`;
+      tokens.push(`${pid}:${sid}`);
+    });
+  });
+  tokens.sort();
+  return tokens.join('|');
+}
+
+/**
+ * Plain object of everything that drives context_fingerprint (Iteration 12).
+ * @param {Record<string, unknown>} job
+ * @param {string} [technicianKey]
+ * @returns {Record<string, string | number>}
+ */
+export function extractJobContextFingerprintMaterial(job, technicianKey = '') {
   const phases = Array.isArray(job?.runbook_phases) ? job.runbook_phases : [];
   let rsc = 0;
   for (const p of phases) {
     rsc += Array.isArray(p?.steps) ? p.steps.length : 0;
   }
+  const erc = Array.isArray(job?.evidence_requirements) ? job.evidence_requirements.length : 0;
   const rfc = Array.isArray(job?.fields_schema)
     ? job.fields_schema.filter((f) => f && f.required).length
     : 0;
-  const ud = job?.updated_date != null ? String(job.updated_date) : '';
+  const rv = job?.runbook_version != null ? String(job.runbook_version) : '';
+  const st = job?.status != null ? String(job.status) : '';
   const tk = technicianKey != null ? String(technicianKey) : '';
-  return JSON.stringify({ context_schema_version: JOB_CONTEXT_SCHEMA_VERSION, erc, rfc, rsc, rv, st, ud, tk });
+  const projectId = normalizeJobContextLinkId(job?.project_id) ?? '';
+  const siteId = normalizeJobContextLinkId(job?.site_id) ?? '';
+  const rb_sig = buildRunbookStructureKey(phases);
+  return {
+    context_schema_version: JOB_CONTEXT_SCHEMA_VERSION,
+    erc,
+    rfc,
+    rsc,
+    rv,
+    st,
+    project_id: projectId,
+    site_id: siteId,
+    rb_sig,
+    tk,
+  };
+}
+
+/**
+ * Stable string for hashing — fixed key order via extractJobContextFingerprintMaterial.
+ * @param {Record<string, unknown>} job
+ * @param {string} [technicianKey] - stable technician id for dedupe (same job + tech + context → one emit)
+ */
+export function buildCanonicalJobContextString(job, technicianKey = '') {
+  return JSON.stringify(extractJobContextFingerprintMaterial(job, technicianKey));
 }
 
 /**
@@ -248,11 +318,13 @@ export function buildJobContextFieldPayload({
     payload.runbook_version = runbookVersion;
   }
 
-  if (job?.project_id != null && job.project_id !== '') {
-    payload.project_id = String(job.project_id);
+  const outboundProjectId = normalizeJobContextLinkId(job?.project_id);
+  if (outboundProjectId != null) {
+    payload.project_id = outboundProjectId;
   }
-  if (job?.site_id != null && job.site_id !== '') {
-    payload.site_id = String(job.site_id);
+  const outboundSiteId = normalizeJobContextLinkId(job?.site_id);
+  if (outboundSiteId != null) {
+    payload.site_id = outboundSiteId;
   }
 
   appendDeviceSession(payload);
@@ -265,6 +337,9 @@ export async function emitJobContextField(opts) {
   return enqueueCanonicalEvent(built, { allowlistKeys: JOB_CONTEXT_FIELD_PROPERTY_KEYS });
 }
 
+/** Serialize snapshot attempts per job (StrictMode double-mount / overlapping async). */
+const emitJobContextFieldChainById = new Map();
+
 /**
  * If fingerprint changed since last emit for this job, build + enqueue and mark storage.
  * @param {Object} o
@@ -275,13 +350,26 @@ export async function emitJobContextFieldIfChanged({ job, user = null }) {
   const jobId = job?.id != null ? String(job.id) : '';
   if (!jobId) return { emitted: false, reason: 'no_job_id' };
 
-  const technicianKey = getTechnicianIdForCanonicalEvents(user);
-  const fingerprint = await computeJobContextFingerprint(job, technicianKey);
-  if (!shouldEmitJobContextSnapshot(jobId, fingerprint)) {
-    return { emitted: false, reason: 'duplicate_fingerprint', fingerprint };
-  }
+  const prev = emitJobContextFieldChainById.get(jobId) ?? Promise.resolve();
 
-  await emitJobContextField({ job, user, contextFingerprint: fingerprint });
-  markJobContextSnapshotEmitted(jobId, fingerprint);
-  return { emitted: true, fingerprint };
+  const run = async () => {
+    const technicianKey = getTechnicianIdForCanonicalEvents(user);
+    const fingerprint = await computeJobContextFingerprint(job, technicianKey);
+    if (!shouldEmitJobContextSnapshot(jobId, fingerprint)) {
+      return { emitted: false, reason: 'duplicate_fingerprint', fingerprint };
+    }
+    await emitJobContextField({ job, user, contextFingerprint: fingerprint });
+    markJobContextSnapshotEmitted(jobId, fingerprint);
+    return { emitted: true, fingerprint };
+  };
+
+  const current = prev.then(run, run);
+  emitJobContextFieldChainById.set(jobId, current);
+  try {
+    return await current;
+  } finally {
+    if (emitJobContextFieldChainById.get(jobId) === current) {
+      emitJobContextFieldChainById.delete(jobId);
+    }
+  }
 }

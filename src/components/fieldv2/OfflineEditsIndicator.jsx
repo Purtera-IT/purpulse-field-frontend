@@ -1,16 +1,18 @@
 /**
- * OfflineEditsIndicator — Shows pending edits queue with sync status
+ * OfflineEditsIndicator — Dexie queuedEdits for this job (durable local mutations until API sync).
  */
-
 import React, { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, Loader2, WifiOff } from 'lucide-react'
 import { db } from '@/lib/db'
 import { cn } from '@/lib/utils'
+import {
+  labelQueuedEditStatus,
+  SYNC_QUEUED_EDITS_SUBTITLE,
+} from '@/lib/fieldJobSyncPresentation'
 
-export default function OfflineEditsIndicator({ jobId, isOnline }) {
+export default function OfflineEditsIndicator({ jobId, isOnline, nested }) {
   const [queuedEdits, setQueuedEdits] = useState([])
 
-  // Poll queued edits for this job
   useEffect(() => {
     const updateEdits = async () => {
       try {
@@ -37,8 +39,9 @@ export default function OfflineEditsIndicator({ jobId, isOnline }) {
 
   return (
     <div className={cn(
-      'border rounded-xl p-3 space-y-2 shadow-sm',
-      !isOnline ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+      'border rounded-xl p-3 space-y-2',
+      nested ? 'bg-white/95 border-slate-200/90 shadow-none' : 'shadow-sm',
+      !nested && (!isOnline ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200')
     )}>
       <div className="flex items-center gap-2">
         {!isOnline ? (
@@ -52,34 +55,43 @@ export default function OfflineEditsIndicator({ jobId, isOnline }) {
         )}
         <p className={cn(
           'text-sm font-semibold',
-          !isOnline ? 'text-amber-900' : 'text-blue-900'
+          nested ? 'text-slate-900' : (!isOnline ? 'text-amber-900' : 'text-blue-900')
         )}>
-          {!isOnline ? 'Offline — Pending Sync' : 'Pending Edits'}
+          {!isOnline ? 'Offline — job changes on this device' : 'Job changes (queued)'}
         </p>
       </div>
 
+      <p className="text-[10px] text-slate-600 leading-relaxed">
+        {SYNC_QUEUED_EDITS_SUBTITLE}
+      </p>
+
       <div className="flex items-center gap-4 text-xs">
-        <span className={!isOnline ? 'text-amber-700' : 'text-blue-700'}>
-          {pendingCount > 0 && <span className="font-bold">{pendingCount} pending</span>}
-          {syncingCount > 0 && <span className="text-blue-600 ml-2">⟳ {syncingCount} syncing</span>}
-          {failedCount > 0 && <span className="text-red-600 ml-2">✗ {failedCount} failed</span>}
+        <span className={nested ? 'text-slate-700' : (!isOnline ? 'text-amber-700' : 'text-blue-700')}>
+          {pendingCount > 0 && (
+            <span className="font-bold">{pendingCount} waiting to sync</span>
+          )}
+          {syncingCount > 0 && (
+            <span className="text-blue-600 ml-2">⟳ {syncingCount} sending</span>
+          )}
+          {failedCount > 0 && (
+            <span className="text-red-600 ml-2">✗ {failedCount} need attention</span>
+          )}
         </span>
       </div>
 
-      {/* Edit list */}
       <div className="space-y-1 border-t pt-2" style={{
-        borderColor: !isOnline ? 'rgba(217, 119, 6, 0.2)' : 'rgba(37, 99, 235, 0.2)'
+        borderColor: nested ? 'rgba(148, 163, 184, 0.35)' : (!isOnline ? 'rgba(217, 119, 6, 0.2)' : 'rgba(37, 99, 235, 0.2)')
       }}>
         {queuedEdits.slice(0, 3).map(edit => (
           <div key={edit.id} className="flex items-center justify-between px-2 py-1 bg-white rounded-lg border border-slate-100/80">
             <span className="text-[10px] text-slate-600 truncate flex-1">{edit.action.toUpperCase()}: {edit.entity_type}</span>
             <span className={cn(
               'text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-2',
-              edit.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-              edit.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-              'bg-red-100 text-red-700'
+              edit.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+              edit.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+              'bg-red-100 text-red-800'
             )}>
-              {edit.status}
+              {labelQueuedEditStatus(edit.status)}
             </span>
           </div>
         ))}

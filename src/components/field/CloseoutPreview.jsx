@@ -10,6 +10,7 @@ import { emitDispatchEventForJobStatusChange } from '@/lib/dispatchEvent';
 import { emitCloseoutEvent } from '@/lib/closeoutEvent';
 import { emitFeedbackEvent } from '@/lib/feedbackEvent';
 import { fetchJobContextForArtifactEvent } from '@/lib/artifactEvent';
+import { deriveCloseoutSubmissionFlags } from '@/lib/closeoutSubmissionFlags';
 
 export default function CloseoutPreview({ job }) {
   const queryClient = useQueryClient();
@@ -50,13 +51,15 @@ export default function CloseoutPreview({ job }) {
 
   const allSteps = phases.flatMap(p => p.steps || []);
   const completedSteps = allSteps.filter(s => s.completed).length;
-  const runbookComplete = allSteps.length === 0 || completedSteps === allSteps.length;
 
-  const hasSignoff = !!job?.signoff_signer_name && !!job?.signoff_signature_url;
+  const closeoutFlags = deriveCloseoutSubmissionFlags(job, evidence);
+  const { runbookComplete, customerSignatureCaptured: hasSignoff } = closeoutFlags;
 
-  const allEvidenceMet = evidenceChecks.every(c => c.met);
-  const allFieldsMet = fieldChecks.every(c => c.met);
-  const canSubmit = allEvidenceMet && allFieldsMet && runbookComplete && hasSignoff;
+  const canSubmit =
+    closeoutFlags.documentationComplete &&
+    closeoutFlags.requiredFieldsComplete &&
+    closeoutFlags.runbookComplete &&
+    closeoutFlags.customerSignatureCaptured;
 
   const hasOptionalFeedback =
     feedbackRating > 0 || complaintFlag || complimentFlag || feedbackNotes.trim().length > 0;
@@ -70,10 +73,10 @@ export default function CloseoutPreview({ job }) {
       await emitCloseoutEvent({
         job: jobForEvent,
         user,
-        documentationComplete: allEvidenceMet,
-        customerSignatureCaptured: hasSignoff,
-        runbookComplete,
-        requiredFieldsComplete: allFieldsMet,
+        documentationComplete: closeoutFlags.documentationComplete,
+        customerSignatureCaptured: closeoutFlags.customerSignatureCaptured,
+        runbookComplete: closeoutFlags.runbookComplete,
+        requiredFieldsComplete: closeoutFlags.requiredFieldsComplete,
         closeoutSubmitTimestampIso: submitTs,
         timecardSubmittedFlag: timecardSubmitted ? true : null,
         invoiceSupportDocsFlag: invoiceSupportDocs ? true : null,

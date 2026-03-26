@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
 import FieldTimeTracker from './FieldTimeTracker';
 import JobStateTransitioner from './JobStateTransitioner';
 import FieldSectionCard from './FieldSectionCard';
+import ReadinessSummaryCard from './ReadinessSummaryCard';
 import { LIFECYCLE_DISPLAY } from '@/lib/fieldJobExecutionModel';
 import {
   FIELD_BODY,
@@ -105,12 +106,14 @@ export default function JobOverview({
         </div>
       </FieldSectionCard>
 
+      <ReadinessSummaryCard job={job} timeEntries={timeEntries} />
+
       <div>
         <p className={cn(FIELD_OVERLINE, 'mb-2 px-0.5')}>
           Job state
         </p>
         <p className="text-[11px] text-slate-500 mb-2 px-0.5 leading-snug">
-          Use this section to update travel, check-in, work, pause, and completion status.
+          Update travel, check-in, work, pause, and completion status here.
         </p>
         <JobStateTransitioner
           job={job}
@@ -197,8 +200,7 @@ export default function JobOverview({
           Work timer
         </p>
         <p className="text-[11px] text-slate-500 mb-2 px-0.5 leading-snug">
-          Billable work time for this job (TimeEntry). Tied to job lifecycle — start after check-in / in
-          progress.
+          Billable time for this job (TimeEntry). Starts after check-in / in progress per job state.
         </p>
         <FieldTimeTracker
           job={job}

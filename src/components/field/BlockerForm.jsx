@@ -48,43 +48,59 @@ export default function BlockerForm({ jobId, variant, onClose, onSubmitted }) {
 
   const createBlocker = useMutation({
     mutationFn: async () => {
-      const blocker = await base44.entities.Blocker.create({
-        job_id: jobId,
-        blocker_type: type,
-        severity,
-        note,
-        photo_evidence_ids: photoIds,
-        status: 'open',
-        sync_status: 'pending',
-      });
-      return { blocker, blockerType: type, severityLevel: severity, noteText: note };
+      const jobCtx = await fetchJobContextForArtifactEvent(jobId);
+      const jobForEvent = { id: jobId, ...jobCtx };
+      try {
+        await emitEscalationEvent({
+          job: jobForEvent,
+          user,
+          reasonCategory: type,
+          escalationSource: 'blocker_create',
+          severity,
+          escalationRecordId: null,
+          notesPreview: note,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) console.error('[BlockerForm] escalation_event', e);
+        throw new Error(`Telemetry: ${msg}`);
+      }
+      try {
+        const blocker = await base44.entities.Blocker.create({
+          job_id: jobId,
+          blocker_type: type,
+          severity,
+          note,
+          photo_evidence_ids: photoIds,
+          status: 'open',
+          sync_status: 'pending',
+        });
+        return { blocker, blockerType: type, severityLevel: severity, noteText: note };
+      } catch (createErr) {
+        if (import.meta.env.DEV) {
+          console.warn('[BlockerForm] Blocker.create failed after escalation_event queued', createErr);
+        }
+        toast.warning(
+          'Escalation was queued, but saving the record failed. Try again or contact support if it persists.'
+        );
+        throw createErr;
+      }
     },
-    onSuccess: async ({ blocker, blockerType, severityLevel, noteText }) => {
+    onSuccess: ({ blocker, blockerType, severityLevel, noteText }) => {
       queryClient.invalidateQueries({ queryKey: ['blockers', jobId] });
       if (isComms) {
         toast.success('Escalation saved for this job.');
       } else {
         toast.success('Blocker reported');
       }
-      try {
-        const jobCtx = await fetchJobContextForArtifactEvent(jobId);
-        await emitEscalationEvent({
-          job: { id: jobId, ...jobCtx },
-          user,
-          reasonCategory: blockerType,
-          escalationSource: 'blocker_create',
-          severity: severityLevel,
-          escalationRecordId: blocker?.id != null ? String(blocker.id) : null,
-          notesPreview: noteText,
-        });
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.warn('[escalation] notify path failed after save', err);
-        }
-        toast.warning('Notification sync may be delayed.');
-      }
       onSubmitted?.({ blocker, blockerType, severityLevel, noteText });
       onClose?.();
+    },
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.startsWith('Telemetry:')) {
+        toast.error('Could not queue escalation — try again');
+      }
     },
   });
 
