@@ -9,9 +9,11 @@ function trim(s: string | undefined): string {
 
 /** True when jobs should load from GET /api/me + /api/assignments (direct or proxy). */
 export function isPurpulseAssignmentsDataSource(): boolean {
-  if (import.meta.env.VITE_USE_ASSIGNMENTS_API !== 'true') return false
+  // Base44 Secrets don't inject into import.meta.env, so proxy mode is always on in production.
+  // Override with VITE_USE_ASSIGNMENTS_API=false to disable (local dev against Base44 entities).
+  if (import.meta.env.VITE_USE_ASSIGNMENTS_API === 'false') return false
   if (trim(import.meta.env.VITE_AZURE_API_BASE_URL).length > 0) return true
-  return import.meta.env.VITE_USE_PURPULSE_ASSIGNMENTS_PROXY === 'true'
+  return true // proxy mode always on in Base44 hosted builds
 }
 
 /**
@@ -26,7 +28,8 @@ export function purpulseFetchUrl(pathAndQuery: string): string {
     return `${direct}${pq}`
   }
 
-  if (import.meta.env.VITE_USE_PURPULSE_ASSIGNMENTS_PROXY === 'true') {
+  // Proxy is always active on Base44 hosted builds (no VITE_ env at runtime)
+  if (true || import.meta.env.VITE_USE_PURPULSE_ASSIGNMENTS_PROXY === 'true') {
     const prefix = trim(import.meta.env.VITE_PURPULSE_PROXY_PATH) || '/mock/api/purpulse'
     const base = prefix.replace(/\/$/, '')
     if (pq.startsWith('/api/me')) return `${base}/me`
