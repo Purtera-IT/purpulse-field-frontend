@@ -36,7 +36,6 @@ import {
 } from '@/lib/evidenceQcViewModel';
 import {
   BTN_PRIMARY,
-  FIELD_BODY,
   FIELD_CARD,
   FIELD_CTRL_H,
   FIELD_META,

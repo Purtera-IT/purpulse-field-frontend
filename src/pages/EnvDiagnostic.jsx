@@ -3,7 +3,7 @@
  * Navigate to /EnvDiagnostic to see exactly which VITE_ flags are in the current build.
  * Useful for confirming the Azure API path is active without opening DevTools.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const FLAG_DEFINITIONS = [
