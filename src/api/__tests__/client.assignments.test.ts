@@ -196,4 +196,38 @@ describe('APIClient.getJobs (PurPulse assignments)', () => {
     expect(jobs[0].assignment_source).toBe('purpulse_api')
     expect(jobs[0].runbook_phases?.length).toBeGreaterThan(0)
   })
+
+  it('uses same-origin proxy paths when VITE_USE_PURPULSE_ASSIGNMENTS_PROXY is true', async () => {
+    vi.stubEnv('VITE_AZURE_API_BASE_URL', '')
+    vi.stubEnv('VITE_USE_PURPULSE_ASSIGNMENTS_PROXY', 'true')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          internal_technician_id: 'tech-uid-1',
+          email: 'pat@example.com',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ assignments: [] }),
+      }) as unknown as typeof fetch
+
+    const client = new APIClient()
+    const jobs = await client.getJobs()
+    expect(jobs).toEqual([])
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(
+      1,
+      '/mock/api/purpulse/me',
+      expect.any(Object),
+    )
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/^\/mock\/api\/purpulse\/assignments\?assigned_to=/),
+      expect.any(Object),
+    )
+  })
 })

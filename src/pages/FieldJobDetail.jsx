@@ -40,6 +40,7 @@ import EvidenceGalleryView from '@/components/fieldv2/EvidenceGalleryView';
 import JobCloseoutSection from '@/components/fieldv2/JobCloseoutSection';
 import JobCommsSection from '@/components/fieldv2/JobCommsSection';
 import FieldJobSyncStrip from '@/components/fieldv2/FieldJobSyncStrip';
+import { isPurpulseAssignmentsDataSource } from '@/lib/purpulseApiConfig';
 
 const LEGACY_TAB_ALIASES = {
   timelog: 'overview',
@@ -71,10 +72,7 @@ export default function FieldJobDetail() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [headerTick, setHeaderTick] = useState(0);
   const qc = useQueryClient();
-  const assignmentsListMode =
-    import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true' &&
-    typeof import.meta.env.VITE_AZURE_API_BASE_URL === 'string' &&
-    import.meta.env.VITE_AZURE_API_BASE_URL.trim().length > 0;
+  const assignmentsListMode = isPurpulseAssignmentsDataSource();
   const { user } = useAuth();
 
   const setSection = (id) => {

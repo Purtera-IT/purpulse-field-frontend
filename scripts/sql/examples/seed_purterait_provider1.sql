@@ -3,7 +3,7 @@
 --
 -- Parsed from request:
 --   Field Nation provider id: 931914
---   Email: max@purtera-it.com (Entra sign-in; /api/me matches JWT email to this column)
+--   Email: max@optbotai.com (Entra sign-in; /api/me matches JWT email to this column)
 --   Display: PurTeraIT Provider1
 --   Location: Alpharetta, GA, US
 --   Phone: (800) 334-9494
@@ -13,7 +13,7 @@ BEGIN;
 WITH upsert_tech AS (
   INSERT INTO technicians (email, first_name, last_name, display_name, status, metadata)
   VALUES (
-    'max@purtera-it.com',
+    'max@optbotai.com',
     'PurTeraIT',
     'Provider1',
     'PurTeraIT Provider1',

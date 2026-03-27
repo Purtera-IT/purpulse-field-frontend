@@ -7,7 +7,7 @@ Upserts **`technicians`** + **`fieldnation_mapping`** for:
 | Field | Value |
 |-------|--------|
 | Field Nation provider id | `931914` |
-| Email | `max@purtera-it.com` (must match Entra account used in the field app) |
+| Email | `max@optbotai.com` (must match Entra account used in the field app) |
 | Name | PurTeraIT / Provider1 (display: PurTeraIT Provider1) |
 | Phone / location | In `metadata` JSON |
 

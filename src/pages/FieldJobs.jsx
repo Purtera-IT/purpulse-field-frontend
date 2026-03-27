@@ -20,6 +20,7 @@ import {
   FIELD_PAGE_PAD_X,
   FIELD_PAGE_PAD_Y,
 } from '@/lib/fieldVisualTokens';
+import { isPurpulseAssignmentsDataSource } from '@/lib/purpulseApiConfig';
 
 const PRIO_CFG = {
   urgent: { label: 'Urgent', dot: 'bg-red-500', text: 'text-red-700 font-semibold' },
@@ -29,10 +30,7 @@ const PRIO_CFG = {
 };
 const FILTER_CHIPS = ['all','assigned','in_progress','paused','pending_closeout','approved'];
 
-const assignmentsListMode =
-  import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true' &&
-  typeof import.meta.env.VITE_AZURE_API_BASE_URL === 'string' &&
-  import.meta.env.VITE_AZURE_API_BASE_URL.trim().length > 0;
+const assignmentsListMode = isPurpulseAssignmentsDataSource();
 
 function StatusBadge({ status }) {
   const c = getFieldJobStatusDisplay(status);

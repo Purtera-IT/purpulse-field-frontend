@@ -23,6 +23,7 @@ import {
 import { base44 } from '@/api/base44Client'
 import { authManager } from '@/lib/auth'
 import { assignmentToJob } from '@/lib/assignments/assignmentToJob'
+import { isPurpulseAssignmentsDataSource, purpulseFetchUrl } from '@/lib/purpulseApiConfig'
 
 /**
  * APIClient — Centralized API adapter with retry logic, validation, and typed responses
@@ -72,9 +73,7 @@ async function getBearerTokenForAzureApi(): Promise<string | null> {
 }
 
 function usePurpulseAssignmentsApi(): boolean {
-  const use = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
-  const base = import.meta.env.VITE_AZURE_API_BASE_URL
-  return use && typeof base === 'string' && base.trim().length > 0
+  return isPurpulseAssignmentsDataSource()
 }
 
 function validateResponse<T>(data: unknown, schema: z.ZodSchema<T>, endpoint: string): T {
@@ -285,16 +284,17 @@ export class APIClient {
 
   /**
    * GET /api/assignments — Resolved jobs + runbook for an internal technician (Option A).
-   * Requires `VITE_USE_ASSIGNMENTS_API=true` and `VITE_AZURE_API_BASE_URL`; otherwise returns [].
+   * Requires `VITE_USE_ASSIGNMENTS_API=true` plus either `VITE_AZURE_API_BASE_URL` (direct) or
+   * `VITE_USE_PURPULSE_ASSIGNMENTS_PROXY=true` (Base44 function proxy); otherwise returns [].
    */
   async getAssignments(
     assignedToInternalId: string,
     config?: RequestConfig
   ): Promise<ResolvedAssignment[]> {
-    const useApi = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
-    const baseRaw = import.meta.env.VITE_AZURE_API_BASE_URL
-    const base = typeof baseRaw === 'string' ? baseRaw.trim().replace(/\/$/, '') : ''
-    if (!useApi || !base || !assignedToInternalId?.trim()) {
+    if (!assignedToInternalId?.trim()) {
+      return []
+    }
+    if (!isPurpulseAssignmentsDataSource()) {
       return []
     }
 
@@ -306,7 +306,12 @@ export class APIClient {
       return []
     }
 
-    const url = `${base}/api/assignments?assigned_to=${encodeURIComponent(assignedToInternalId.trim())}`
+    const url = purpulseFetchUrl(
+      `/api/assignments?assigned_to=${encodeURIComponent(assignedToInternalId.trim())}`,
+    )
+    if (!url) {
+      return []
+    }
     const res = await fetch(url, {
       method: 'GET',
       headers: {
@@ -334,14 +339,10 @@ export class APIClient {
 
   /**
    * GET /api/me — Resolve JWT to technicians row (email / idp_subject).
-   * Requires `VITE_USE_ASSIGNMENTS_API=true` and `VITE_AZURE_API_BASE_URL`.
-   * Returns null if not provisioned (404) or feature off.
+   * Same env as getAssignments (direct Azure URL or proxy). Returns null if not provisioned (404) or feature off.
    */
   async getTechnicianMe(config?: RequestConfig): Promise<TechnicianMe | null> {
-    const useApi = import.meta.env.VITE_USE_ASSIGNMENTS_API === 'true'
-    const baseRaw = import.meta.env.VITE_AZURE_API_BASE_URL
-    const base = typeof baseRaw === 'string' ? baseRaw.trim().replace(/\/$/, '') : ''
-    if (!useApi || !base) {
+    if (!isPurpulseAssignmentsDataSource()) {
       return null
     }
 
@@ -350,7 +351,10 @@ export class APIClient {
       return null
     }
 
-    const url = `${base}/api/me`
+    const url = purpulseFetchUrl('/api/me')
+    if (!url) {
+      return null
+    }
     const res = await fetch(url, {
       method: 'GET',
       headers: {
